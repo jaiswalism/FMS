@@ -1,20 +1,22 @@
 ## Feature
 
 ### Summary
-Describe the feature.
+<!-- Describe the feature. -->
 
 ### Problem
-What problem does this solve?
+<!-- What problem does this solve? -->
 
 ### Solution
-Explain the implementation.
+<!-- Explain the implementation. -->
 
 ### Changes
+<!-- List changes:
 - New components/modules
 - Updated APIs
+-->
 
 ### Testing
-How this was tested.
+<!-- How this was tested. -->
 
 ### Checklist
 - [ ] Tests added
