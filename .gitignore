@@ -1,0 +1,39 @@
+# --- Xcode ---
+# Generated files and build artifacts
+build/
+DerivedData/
+*.moved-aside
+*.xcscmblueprint
+*.xccheckout
+
+# User-specific Xcode settings
+# (We ignore these to avoid merge conflicts and leaking personal paths)
+xcuserdata/
+*.xcuserdatad
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# --- Swift Package Manager ---
+# Ignore the build directory used by SPM
+.build/
+
+# --- Dependency Managers ---
+Pods/
+Carthage/Build/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+
+# --- Security & Credentials ---
+# Ignore environment files that might contain Supabase keys or secrets
+.env
+*.p12
+*.cer
+*.mobileprovision
+
+# --- Backup and Temporary Files ---
+*.swp
+*~
+*.lock
