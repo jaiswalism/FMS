@@ -10,16 +10,23 @@ public enum Role: String, CaseIterable, Codable {
 @Observable
 public class AuthViewModel {
     public var selectedRole: Role?
+    public var isAuthenticated: Bool = false
     
-    public init(selectedRole: Role? = nil) {
+    public init(selectedRole: Role? = nil, isAuthenticated: Bool = false) {
         self.selectedRole = selectedRole
+        self.isAuthenticated = isAuthenticated
     }
     
     public func selectRole(_ role: Role) {
         selectedRole = role
     }
     
+    public func authenticate() {
+        isAuthenticated = true
+    }
+    
     public func logout() {
         selectedRole = nil
+        isAuthenticated = false
     }
 }

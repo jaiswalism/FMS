@@ -7,6 +7,8 @@ public struct FMSRoleCard: View {
     public let isSelected: Bool
     public let action: () -> Void
     
+    private let labelColor = Color(red: 110/255, green: 110/255, blue: 120/255)
+    
     public init(title: String, systemImage: String, description: String, isSelected: Bool, action: @escaping () -> Void) {
         self.title = title
         self.systemImage = systemImage
@@ -17,34 +19,45 @@ public struct FMSRoleCard: View {
     
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: 20) {
+            HStack(spacing: 18) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundColor(isSelected ? FMSTheme.obsidian : FMSTheme.amber)
-                    .frame(width: 60)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundColor(isSelected ? FMSTheme.amber : Color(red: 60/255, green: 60/255, blue: 70/255))
+                    .frame(width: 36)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.title2.weight(.bold))
-                        .foregroundColor(isSelected ? FMSTheme.obsidian : .primary)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(Color(red: 30/255, green: 30/255, blue: 35/255))
                     
                     Text(description)
-                        .font(.subheadline)
-                        .foregroundColor(isSelected ? FMSTheme.obsidian.opacity(0.8) : .secondary)
-                        .multilineTextAlignment(.leading)
+                        .font(.system(size: 14))
+                        .foregroundColor(labelColor)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
                 Spacer()
+                
+                // Checkmark indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(FMSTheme.amber)
+                }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? FMSTheme.amber : FMSTheme.obsidian)
-            .cornerRadius(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? FMSTheme.amber.opacity(0.08) : Color.white)
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(FMSTheme.amber, lineWidth: isSelected ? 0 : 2)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? FMSTheme.amber : Color(red: 235/255, green: 235/255, blue: 240/255), lineWidth: isSelected ? 2 : 1)
             )
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }

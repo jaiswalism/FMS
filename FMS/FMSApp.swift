@@ -13,13 +13,16 @@ struct FMSApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authViewModel.selectedRole == nil {
-                RoleSelectionView()
-                    .environment(authViewModel)
-            } else {
-                MainDashboardView()
-                    .environment(authViewModel)
+            Group {
+                if authViewModel.selectedRole == nil {
+                    RoleSelectionView()
+                } else if authViewModel.selectedRole == .fleetManager && !authViewModel.isAuthenticated {
+                    FleetManagerLoginView()
+                } else {
+                    MainDashboardView()
+                }
             }
+            .environment(authViewModel)
         }
     }
 }
