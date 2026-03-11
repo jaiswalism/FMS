@@ -59,9 +59,9 @@ public struct FleetStatusCard: View {
                     
                     Button(action: onViewMap) {
                         HStack(spacing: 6) {
-                            Text("View Map")
+                            Text("View All")
                                 .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "map.fill")
+                            Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundColor(FMSTheme.obsidian)

@@ -9,11 +9,9 @@ public struct FleetManagerDashboardView: View {
                 FleetManagerHomeTab()
             }
             FMSTabItem(id: "fleet", title: "Fleet", icon: "truck.box.fill") {
-                // TODO: Fleet tab
                 Text("Fleet")
             }
             FMSTabItem(id: "drivers", title: "Drivers", icon: "person.2.fill") {
-                // TODO: Drivers tab
                 Text("Drivers")
             }
         }
@@ -21,8 +19,9 @@ public struct FleetManagerDashboardView: View {
 }
 
 // MARK: - Home Tab Content
-
 struct FleetManagerHomeTab: View {
+    @State private var navigateToLiveFleet = false
+    
     // Mock data
     private let managerName = "Manager"
     private let activeVehicles = 14
@@ -35,37 +34,44 @@ struct FleetManagerHomeTab: View {
     ]
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
-                headerSection
-                
-                // Fleet Status Card
-                FleetStatusCard(
-                    activeCount: activeVehicles,
-                    subtitle: "Vehicles in transit",
-                    onViewMap: {
-                        // Navigate to map
-                    }
-                )
-                
-                // Quick Actions
-                QuickActionCard(
-                    icon: "shippingbox.fill",
-                    title: "Pending Orders",
-                    subtitle: "\(pendingOrders) orders awaiting dispatch",
-                    action: {
-                        // Navigate to orders
-                    }
-                )
-                
-                // Recent Alerts Section
-                alertsSection
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    headerSection
+                    
+                    // Fleet Status Card
+                    // Tapping the card's action (or View All) now triggers the navigation
+                    FleetStatusCard(
+                        activeCount: activeVehicles,
+                        subtitle: "Vehicles in transit",
+                        onViewMap: {
+                            navigateToLiveFleet = true
+                        }
+                    )
+                    
+                    // Quick Actions
+                    QuickActionCard(
+                        icon: "shippingbox.fill",
+                        title: "Pending Orders",
+                        subtitle: "\(pendingOrders) orders awaiting dispatch",
+                        action: {
+                            // Navigate to orders
+                        }
+                    )
+                    
+                    // Recent Alerts Section
+                    alertsSection
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
+            .background(FMSTheme.backgroundPrimary)
+            // Maps the boolean to the destination screen cleanly
+            .navigationDestination(isPresented: $navigateToLiveFleet) {
+                LiveVehicleDashboardView()
+            }
         }
-        .background(FMSTheme.backgroundPrimary)
     }
     
     // MARK: - Header Section
@@ -83,7 +89,6 @@ struct FleetManagerHomeTab: View {
             
             Spacer()
             
-            // Profile avatar
             ZStack {
                 Circle()
                     .fill(FMSTheme.borderLight)
@@ -114,14 +119,9 @@ struct FleetManagerHomeTab: View {
         }
     }
     
-    // MARK: - Helpers
     private var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMMM d"
         return formatter.string(from: Date())
     }
-}
-
-#Preview {
-    FleetManagerDashboardView()
 }
