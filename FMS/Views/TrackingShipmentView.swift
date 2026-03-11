@@ -241,7 +241,7 @@ public struct TrackingShipmentView: View {
                 
                 VStack(alignment: .leading, spacing: 30) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Current Location")
+                        Text("Origin")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(dynamicTextSecondary)
                         Text(viewModel.trip?.startName ?? "Unknown Origin")
