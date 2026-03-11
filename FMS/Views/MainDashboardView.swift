@@ -6,6 +6,24 @@ public struct MainDashboardView: View {
     public init() {}
     
     public var body: some View {
+        Group {
+            switch authViewModel.selectedRole {
+            case .fleetManager:
+                FleetManagerDashboardView()
+            case .driver:
+                // TODO: DriverDashboardView
+                placeholderView(role: "Driver")
+            case .maintenance:
+                // TODO: MaintenanceDashboardView
+                placeholderView(role: "Maintenance")
+            case .none:
+                placeholderView(role: "Unknown")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func placeholderView(role: String) -> some View {
         NavigationStack {
             ZStack {
                 Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
@@ -18,11 +36,9 @@ public struct MainDashboardView: View {
                     Text("Welcome to Dashboard")
                         .font(.title.weight(.bold))
                     
-                    if let role = authViewModel.selectedRole {
-                        Text("Logged in as **\(role.rawValue)**")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
+                    Text("Logged in as **\(role)**")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
                     
                     Spacer().frame(height: 40)
                     
