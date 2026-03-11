@@ -17,13 +17,17 @@ public struct FMSTextField: View {
     private var textFieldBackground: Color {
         colorScheme == .dark ? Color(red: 20/255, green: 20/255, blue: 25/255) : .white
     }
-    private let labelColor = Color(red: 130/255, green: 130/255, blue: 140/255)
-    private let placeholderColor = Color(red: 130/255, green: 130/255, blue: 140/255)
+    private var labelColor: Color {
+        colorScheme == .dark ? Color(red: 170/255, green: 170/255, blue: 180/255) : Color(red: 130/255, green: 130/255, blue: 140/255)
+    }
+    private var placeholderColor: Color {
+        colorScheme == .dark ? Color(red: 160/255, green: 160/255, blue: 170/255) : Color(red: 130/255, green: 130/255, blue: 140/255)
+    }
     private var borderColor: Color {
         colorScheme == .dark ? Color(red: 40/255, green: 40/255, blue: 45/255) : Color(red: 230/255, green: 230/255, blue: 235/255)
     }
     private var textColor: Color {
-        colorScheme == .dark ? .white : .black
+        colorScheme == .dark ? Color(red: 230/255, green: 230/255, blue: 235/255) : .black
     }
     
     public init(

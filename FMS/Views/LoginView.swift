@@ -97,7 +97,7 @@ public struct LoginView: View {
                                 .font(.system(size: 15, weight: .bold))
                         }
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(FMSTheme.amber)
