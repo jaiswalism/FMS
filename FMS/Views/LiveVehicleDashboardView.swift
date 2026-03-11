@@ -61,25 +61,28 @@ public struct LiveVehicleDashboardView: View {
                 // Content
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        // For the sake of the UI matching the provided image, we render a few dummy cards if loading/empty
-                        // In a real scenario, this would iterate over actual data.
                         if viewModel.isLoading {
                             ProgressView()
                                 .padding(.top, 50)
                         } else {
                             // Using a mix of actual and mock data to show the layout precisely.
                             ForEach(0..<6) { _ in
-                                LiveTripCard(
-                                    plateNumber: "MH02H0942",
-                                    origin: "MYS",
-                                    destination: "BLR",
-                                    completionPercentage: 48
-                                )
+                                NavigationLink {
+                                    TrackingShipmentView()
+                                } label: {
+                                    LiveTripCard(
+                                        plateNumber: "MH02H0942",
+                                        origin: "MYS",
+                                        destination: "BLR",
+                                        completionPercentage: 48
+                                    )
+                                }
+                                .buttonStyle(.plain) // Prevents the card from being highlighted blue
                             }
                         }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 120) // padding for tab bar
+                    } // <-- LazyVStack cleanly closes here
+                    .padding(.horizontal, 20) // Padding is now correctly applied to the LazyVStack
+                    .padding(.bottom, 120)
                 }
             }
         }
