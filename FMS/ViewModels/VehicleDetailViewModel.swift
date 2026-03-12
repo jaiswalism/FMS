@@ -18,6 +18,12 @@ public class VehicleDetailViewModel {
     
     @MainActor
     public func fetch(vehicleId: String) async {
+        trips = []
+        workOrders = []
+        incidents = []
+        tripsErrorMessage = nil
+        workOrdersErrorMessage = nil
+        incidentsErrorMessage = nil
         await withTaskGroup(of: Void.self) { group in
             group.addTask { [weak self] in
                 await self?.fetchTrips(vehicleId: vehicleId)

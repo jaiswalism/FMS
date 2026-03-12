@@ -91,7 +91,7 @@ public struct FMSTheme {
     )
     
     public static func statusColor(for status: String) -> Color {
-        switch status.lowercased() {
+        switch VehicleStatus.normalize(status) {
         case "active":
             return alertGreen
         case "maintenance":

@@ -19,7 +19,10 @@ public class FleetViewModel {
         
         // Filter by status
         if selectedStatus != "All" {
-            result = result.filter { $0.status?.lowercased() == selectedStatus.lowercased() }
+            let normalizedSelected = VehicleStatus.normalize(selectedStatus)
+            result = result.filter {
+                VehicleStatus.normalize($0.status ?? "") == normalizedSelected
+            }
         }
         
         // Filter by search text
@@ -41,7 +44,7 @@ public class FleetViewModel {
     }
     
     @MainActor
-    public func fetchVehicles() async {
+    public func fetchVehicles() async throws {
         isLoading = true
         defer { isLoading = false }
         
@@ -60,6 +63,7 @@ public class FleetViewModel {
             self.errorMessage = error.localizedDescription
             self.loadErrorMessage = error.localizedDescription
             print("Error fetching vehicles: \(error)")
+            throw error
         }
     }
     
@@ -82,7 +86,7 @@ public class FleetViewModel {
                 .execute()
             
             // Re-fetch or optimistically add. We'll simply re-fetch to ensure sync
-            await fetchVehicles()
+            try await fetchVehicles()
         } catch {
             self.errorMessage = error.localizedDescription
             print("Error adding vehicle: \(error)")

@@ -75,7 +75,11 @@ public struct FleetManagementView: View {
                 }
             }
             .task {
-                await viewModel.fetchVehicles()
+                do {
+                    try await viewModel.fetchVehicles()
+                } catch {
+                    // Error state already captured in view model.
+                }
             }
             .onChange(of: viewModel.errorMessage) { _, newValue in
                 guard let message = newValue else { return }
@@ -203,17 +207,7 @@ private extension FleetManagementView {
     }
     
     func normalizeStatus(_ status: String) -> String {
-        let value = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        switch value {
-        case "active", "on trip", "moving", "in transit":
-            return "active"
-        case "maintenance", "in service", "service":
-            return "maintenance"
-        case "inactive", "idle", "stopped", "in yard":
-            return "inactive"
-        default:
-            return value
-        }
+        VehicleStatus.normalize(status)
     }
 }
 

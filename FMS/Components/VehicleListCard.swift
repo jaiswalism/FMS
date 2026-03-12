@@ -66,7 +66,7 @@ struct VehicleListCard: View {
                 // Action Buttons
                 HStack(spacing: 12) {
                     Button {
-                        // Track Action
+                        // Tracking flow not wired yet.
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "location.fill")
@@ -82,6 +82,7 @@ struct VehicleListCard: View {
                         .background(FMSTheme.amber)
                         .cornerRadius(10)
                     }
+                    .disabled(true)
                 }
                 .padding(.top, 4)
             }

@@ -328,12 +328,6 @@ public struct AddVehicleView: View {
         // Disable interactions
         isSubmitting = true
         
-        let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.calendar = Calendar(identifier: .gregorian)
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let todayString = dateFormatter.string(from: Date())
-        
         let vehicle = Vehicle(
             id: UUID().uuidString,
             plateNumber: trimmedPlate,
@@ -343,7 +337,7 @@ public struct AddVehicleView: View {
             fuelType: fuelType.lowercased(),
             fuelTankCapacity: Double(validatedTankCapacity),
             carryingCapacity: Double(validatedCarryingCapacity),
-            purchaseDateString: todayString,
+            purchaseDateString: nil,
             odometer: Double(validatedOdometer),
             status: "inactive",
             createdBy: nil, 
