@@ -7,6 +7,8 @@ import Supabase
 public class FleetViewModel {
     public var vehicles: [Vehicle] = []
     public var isLoading = false
+    public var errorMessage: String? = nil
+    public var loadErrorMessage: String? = nil
     public var selectedStatus: String = "All"
     public var searchText: String = ""
     
@@ -52,7 +54,11 @@ public class FleetViewModel {
                 .value
                 
             self.vehicles = fetchedVehicles
+            self.errorMessage = nil
+            self.loadErrorMessage = nil
         } catch {
+            self.errorMessage = error.localizedDescription
+            self.loadErrorMessage = error.localizedDescription
             print("Error fetching vehicles: \(error)")
         }
     }
@@ -77,6 +83,7 @@ public class FleetViewModel {
             await fetchVehicles()
             return true
         } catch {
+            self.errorMessage = error.localizedDescription
             print("Error adding vehicle: \(error)")
             return false
         }

@@ -33,12 +33,14 @@ public struct FMSTextField: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !label.isEmpty {
+            if !label.isEmpty || (trailingLabel != nil && trailingAction != nil) {
                 HStack {
-                    Text(label.uppercased())
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(FMSTheme.textSecondary)
-                        .tracking(0.5)
+                    if !label.isEmpty {
+                        Text(label.uppercased())
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(FMSTheme.textSecondary)
+                            .tracking(0.5)
+                    }
                     
                     Spacer()
                     

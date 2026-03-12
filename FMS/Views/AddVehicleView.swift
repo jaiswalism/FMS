@@ -109,7 +109,7 @@ public struct AddVehicleView: View {
                                             text: Binding(
                                                 get: { tankCapacity },
                                                 set: { newValue in
-                                                    tankCapacity = newValue.filter { "0123456789.".contains($0) }
+                                                    tankCapacity = sanitizeDecimalInput(newValue)
                                                 }
                                             )
                                         )
@@ -122,7 +122,7 @@ public struct AddVehicleView: View {
                                             text: Binding(
                                                 get: { carryingCapacity },
                                                 set: { newValue in
-                                                    carryingCapacity = newValue.filter { "0123456789.".contains($0) }
+                                                    carryingCapacity = sanitizeDecimalInput(newValue)
                                                 }
                                             )
                                         )
@@ -213,6 +213,22 @@ public struct AddVehicleView: View {
         value.uppercased().filter { $0.isLetter || $0.isNumber }
     }
     
+    private func sanitizeDecimalInput(_ value: String) -> String {
+        var result = ""
+        var hasDecimal = false
+        
+        for char in value {
+            if char.isNumber {
+                result.append(char)
+            } else if char == "." && !hasDecimal {
+                result.append(char)
+                hasDecimal = true
+            }
+        }
+        
+        return result
+    }
+    
     @MainActor
     private func submitVehicle() {
         // Comprehensive validation
@@ -300,4 +316,5 @@ public struct AddVehicleView: View {
 
 #Preview {
     AddVehicleView { _ in return true }
+        .environment(BannerManager())
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct FleetManagementView: View {
+    @Environment(BannerManager.self) private var bannerManager
     @State private var viewModel = FleetViewModel()
     @State private var showingAddVehicle = false
     @State private var selectedVehicle: Vehicle? = nil
@@ -29,9 +30,28 @@ public struct FleetManagementView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: FMSTheme.textSecondary))
                             .foregroundColor(FMSTheme.textSecondary)
                         Spacer()
+                    } else if let loadError = viewModel.loadErrorMessage, viewModel.vehicles.isEmpty {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Text("Unable to load vehicles")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(FMSTheme.textPrimary)
+                            Text(loadError)
+                                .font(.system(size: 13))
+                                .foregroundColor(FMSTheme.textTertiary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                        }
+                        Spacer()
                     } else if viewModel.vehicles.isEmpty {
                         Spacer()
                         Text("No vehicles found.")
+                            .font(.system(size: 16))
+                            .foregroundColor(FMSTheme.textTertiary)
+                        Spacer()
+                    } else if viewModel.filteredVehicles.isEmpty {
+                        Spacer()
+                        Text("No results match your filters.")
                             .font(.system(size: 16))
                             .foregroundColor(FMSTheme.textTertiary)
                         Spacer()
@@ -56,6 +76,11 @@ public struct FleetManagementView: View {
             }
             .task {
                 await viewModel.fetchVehicles()
+            }
+            .onChange(of: viewModel.errorMessage) { _, newValue in
+                guard let message = newValue else { return }
+                bannerManager.show(type: .error, message: message)
+                viewModel.errorMessage = nil
             }
             .sheet(isPresented: $showingAddVehicle) {
                 AddVehicleView { newVehicle in

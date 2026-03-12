@@ -13,6 +13,7 @@ A premium B2B iOS SaaS (Amber/Rapido Theme) for logistics. Replaces OBD-II hardw
 ```bash
 # Debug Build
 xcodebuild -project FMS.xcodeproj -scheme FMS -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+```
 
 
 ## 1. Role Definitions
@@ -34,4 +35,3 @@ xcodebuild -project FMS.xcodeproj -scheme FMS -configuration Debug -sdk iphonesi
 5. **FuelLog:** Volume, Cost, and Odometer capture.
 6. **TelemetryData:** LocationCoordinate wrapper for sensor logs.
 7. **VehicleEvent:** Harsh braking or maintenance alerts
-
