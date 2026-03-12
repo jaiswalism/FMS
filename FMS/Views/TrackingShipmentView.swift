@@ -16,7 +16,6 @@ public struct TrackingShipmentView: View {
     @State private var previousDragTranslation: CGFloat = 0
     @State private var cameraPosition: MapCameraPosition = .automatic
     
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     
     private let minSheetHeight: CGFloat = 420
@@ -113,7 +112,7 @@ public struct TrackingShipmentView: View {
         .background(FMSTheme.backgroundPrimary)
         .fmsGlassEffect(cornerRadius: 32)
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 15, x: 0, y: -5)
+        .shadow(color: FMSTheme.shadowLarge, radius: 15, x: 0, y: -5)
         .gesture(
             DragGesture()
                 .onChanged { value in

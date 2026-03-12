@@ -73,4 +73,20 @@ public struct FMSTheme {
         light: Color(red: 180/255, green: 180/255, blue: 185/255),
         dark: Color(red: 110/255, green: 110/255, blue: 115/255)
     )
+    
+    // Shadows
+    public static let shadowSmall = Color(
+        light: Color.black.opacity(0.05),
+        dark: Color.black.opacity(0.3)
+    )
+    
+    public static let shadowMedium = Color(
+        light: Color.black.opacity(0.1),
+        dark: Color.black.opacity(0.4)
+    )
+    
+    public static let shadowLarge = Color(
+        light: Color.black.opacity(0.12),
+        dark: Color.black.opacity(0.4)
+    )
 }

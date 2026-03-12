@@ -10,8 +10,6 @@ import SwiftUI
 
 struct VehicleListCard: View {
     let vehicle: Vehicle
-    @Environment(\.colorScheme) private var colorScheme
-    
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
@@ -59,7 +57,7 @@ struct VehicleListCard: View {
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(FMSTheme.cardBackground)
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 4, x: 0, y: 2)
+                .shadow(color: FMSTheme.shadowSmall, radius: 4, x: 0, y: 2)
         )
     }
     

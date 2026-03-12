@@ -62,7 +62,7 @@ public struct FMSBanner: View {
                 alignment: .leading
             )
             .cornerRadius(12)
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.1), radius: 12, x: 0, y: 4)
+            .shadow(color: FMSTheme.shadowMedium, radius: 12, x: 0, y: 4)
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
