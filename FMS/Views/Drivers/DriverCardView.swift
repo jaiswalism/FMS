@@ -2,123 +2,337 @@ import SwiftUI
 
 // MARK: - DriverCardView
 
-/// Reusable card component for the Driver Directory list.
-///
-/// Displays driver summary: avatar, name, employee ID, vehicle, status badge,
-/// shift progress via `ProgressView`, and phone/message quick-action buttons.
-/// Designed to be wrapped in a `NavigationLink`.
+/// Directory list card. iOS 26 design: system background, custom thicker
+/// progress bar via ZStack+GeometryReader geometry, colored left rail.
+/// Entire card is tappable (wrapped in NavigationLink by parent).
 struct DriverCardView: View {
 
     let driver: DriverDisplayItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            topRow
-            vehicleRow
-            shiftProgressSection
-            actionButtons
+        HStack(spacing: 0) {
+            statusRail
+            cardContent
         }
-        .padding(16)
-        .background(FMSTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Top Row
+    // MARK: - Left Status Rail
 
-    private var topRow: some View {
-        HStack(alignment: .top, spacing: 12) {
-            AvatarCircle(initials: driver.avatarInitials, color: avatarColor)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(driver.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FMSTheme.textPrimary)
-                Text("ID: \(driver.employeeID)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(FMSTheme.textSecondary)
-            }
-            Spacer(minLength: 4)
-            StatusBadge(status: driver.availabilityStatus)
-        }
+    private var statusRail: some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(railColor)
+            .frame(width: 4)
+            .padding(.vertical, 10)
     }
 
-    // MARK: - Vehicle Row
+    // MARK: - Card Content
 
-    private var vehicleRow: some View {
-        Group {
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DriverNameRow(name: driver.name, status: driver.availabilityStatus)
+
+            Text("ID: \(driver.employeeID)")
+                .font(.footnote)
+                .foregroundStyle(Color(.secondaryLabel))
+
             if let vName = driver.vehicleDisplayName, let plate = driver.plateNumber {
-                HStack(spacing: 6) {
-                    Image(systemName: "truck.box.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(FMSTheme.textTertiary)
-                    Text("\(vName) · \(plate)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(FMSTheme.textSecondary)
-                }
+                VehicleRow(vehicleName: vName, plate: plate)
             }
+
+            ShiftProgressRow(label: driver.shiftProgressLabel, progress: driver.shiftProgress)
+
+            CallButton()
         }
+        .padding(.leading, 14)
+        .padding(.trailing, 16)
+        .padding(.vertical, 16)
     }
 
-    // MARK: - Shift Progress
-
-    private var shiftProgressSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("SHIFT PROGRESS")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(FMSTheme.textTertiary)
-                Spacer()
-                Text(driver.shiftProgressLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(FMSTheme.textSecondary)
-            }
-            ProgressView(value: driver.shiftProgress)
-                .tint(FMSTheme.amber)
-        }
-    }
-
-    // MARK: - Quick Actions
-
-    private var actionButtons: some View {
-        HStack(spacing: 12) {
-            Spacer()
-            Button {
-                // TODO: Initiate phone call
-            } label: {
-                Image(systemName: "phone.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(FMSTheme.amber)
-                    .frame(width: 36, height: 36)
-                    .background(FMSTheme.amber.opacity(0.15))
-                    .clipShape(Circle())
-            }
-            Button {
-                // TODO: Open message
-            } label: {
-                Image(systemName: "message.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(FMSTheme.amber)
-                    .frame(width: 36, height: 36)
-                    .background(FMSTheme.amber.opacity(0.15))
-                    .clipShape(Circle())
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var avatarColor: Color {
+    private var railColor: Color {
         switch driver.availabilityStatus {
         case .available: return FMSTheme.alertGreen
         case .onTrip:    return FMSTheme.amber
-        case .offDuty:   return FMSTheme.textTertiary
+        case .offDuty:   return Color(.tertiaryLabel)
         }
     }
 }
 
-// MARK: - Shared Sub-components
+// MARK: - DriverShiftCardView
 
-/// A small circle with two-letter initials.
+/// Shifts list card. Same iOS 26 pattern as DriverCardView.
+struct DriverShiftCardView: View {
+
+    let shift: ShiftDisplayItem
+
+    var body: some View {
+        HStack(spacing: 0) {
+            statusRail
+            cardContent
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var statusRail: some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(railColor)
+            .frame(width: 4)
+            .padding(.vertical, 10)
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ShiftNameRow(name: shift.driverName, status: shift.status, label: shift.statusLabel)
+
+            if let vName = shift.vehicleDisplayName, let plate = shift.plateNumber {
+                VehicleRow(vehicleName: vName, plate: plate)
+            }
+
+            ShiftTimingRow(start: shift.shiftStart, end: shift.shiftEnd)
+            ShiftProgressRow(label: shift.progressLabel, progress: shift.progress)
+
+            TrackButton()
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 16)
+        .padding(.vertical, 16)
+    }
+
+    private var railColor: Color {
+        switch shift.status {
+        case "on_duty":     return FMSTheme.alertGreen
+        case "break":       return FMSTheme.amber
+        case "not_started": return Color(.tertiaryLabel)
+        default:            return Color(.separator)
+        }
+    }
+}
+
+// MARK: - Extracted Card Row Subviews
+// Extracted as separate structs so SwiftUI can diff them independently
+// without re-computing the entire card body on every state tick.
+
+struct DriverNameRow: View {
+    let name: String
+    let status: DriverAvailabilityStatus
+
+    var body: some View {
+        HStack {
+            Text(name)
+                .font(.headline)
+                .foregroundStyle(Color(.label))
+            Spacer(minLength: 8)
+            StatusBadge(status: status)
+        }
+    }
+}
+
+private struct ShiftNameRow: View {
+    let name: String
+    let status: String
+    let label: String
+
+    var body: some View {
+        HStack {
+            Text(name)
+                .font(.headline)
+                .foregroundStyle(Color(.label))
+            Spacer(minLength: 8)
+            ShiftStatusChip(status: status, label: label)
+        }
+    }
+}
+
+struct VehicleRow: View {
+    let vehicleName: String
+    let plate: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "truck.box.fill")
+                .font(.caption)
+                .foregroundStyle(Color(.tertiaryLabel))
+            Text(vehicleName)
+                .font(.subheadline)
+                .foregroundStyle(Color(.secondaryLabel))
+            Text("·")
+                .font(.caption)
+                .foregroundStyle(Color(.tertiaryLabel))
+            Text(plate)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color(.secondaryLabel))
+        }
+    }
+}
+
+private struct ShiftTimingRow: View {
+    let start: Date?
+    let end: Date?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock")
+                .font(.caption)
+                .foregroundStyle(Color(.tertiaryLabel))
+            Text(formatted(start))
+                .font(.subheadline)
+                .foregroundStyle(Color(.secondaryLabel))
+            Image(systemName: "arrow.right")
+                .font(.caption2)
+                .foregroundStyle(Color(.tertiaryLabel))
+            Text(formatted(end))
+                .font(.subheadline)
+                .foregroundStyle(Color(.secondaryLabel))
+        }
+    }
+
+    private func formatted(_ date: Date?) -> String {
+        guard let d = date else { return "--" }
+        let f = DateFormatter()
+        f.dateFormat = "hh:mm a"
+        return f.string(from: d)
+    }
+}
+
+/// Thicker progress bar using a custom fill shape — avoids the
+/// unreliable `scaleEffect` hack on ProgressView.
+struct ShiftProgressRow: View {
+    let label: String
+    let progress: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("SHIFT PROGRESS")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color(.tertiaryLabel))
+                Spacer()
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(.label))
+            }
+            ThickProgressBar(progress: progress, tint: FMSTheme.amber)
+        }
+    }
+}
+
+/// Custom 8pt tall progress bar drawn via GeometryReader.
+private struct ThickProgressBar: View {
+    let progress: Double
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(.systemFill))
+                    .frame(height: 8)
+                Capsule()
+                    .fill(tint)
+                    .frame(width: geo.size.width * max(0, min(1, progress)), height: 8)
+                    .animation(.easeInOut(duration: 0.3), value: progress)
+            }
+        }
+        .frame(height: 8)
+    }
+}
+
+private struct CallButton: View {
+    var body: some View {
+        Button {
+            // TODO: Initiate call
+        } label: {
+            Label("Call", systemImage: "phone.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color(.systemBackground))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(FMSTheme.amber, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+}
+
+private struct TrackButton: View {
+    var body: some View {
+        Button {
+            // TODO: Track shift
+        } label: {
+            Label("Track", systemImage: "location.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color(.systemBackground))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(FMSTheme.amber, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+}
+
+// MARK: - Shared Status Components
+
+/// Pill badge for driver availability status.
+struct StatusBadge: View {
+    let status: DriverAvailabilityStatus
+
+    var body: some View {
+        Label(status.displayLabel.uppercased(), systemImage: "circle.fill")
+            .font(.caption2.weight(.bold))
+            .labelStyle(DotLabelStyle())
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .foregroundStyle(color)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var color: Color {
+        switch status {
+        case .available: return FMSTheme.alertGreen
+        case .onTrip:    return FMSTheme.amber
+        case .offDuty:   return Color(.tertiaryLabel)
+        }
+    }
+}
+
+/// Pill badge for shift status.
+private struct ShiftStatusChip: View {
+    let status: String
+    let label: String
+
+    var body: some View {
+        Label(label.uppercased(), systemImage: "circle.fill")
+            .font(.caption2.weight(.bold))
+            .labelStyle(DotLabelStyle())
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .foregroundStyle(color)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var color: Color {
+        switch status {
+        case "on_duty":     return FMSTheme.alertGreen
+        case "break":       return FMSTheme.amber
+        case "not_started": return Color(.tertiaryLabel)
+        default:            return Color(.secondaryLabel)
+        }
+    }
+}
+
+/// Inline dot before label text.
+private struct DotLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon
+                .font(.system(size: 5))
+            configuration.title
+        }
+    }
+}
+
+/// Plain circle with initials — kept for DriverDetailView.
 struct AvatarCircle: View {
     let initials: String
     let color: Color
@@ -126,39 +340,10 @@ struct AvatarCircle: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(color)
-                .frame(width: size, height: size)
+            Circle().fill(color).frame(width: size, height: size)
             Text(initials)
                 .font(.system(size: size * 0.33, weight: .semibold))
                 .foregroundStyle(.white)
         }
-    }
-}
-
-/// Color-coded status badge pill.
-struct StatusBadge: View {
-    let status: DriverAvailabilityStatus
-
-    var body: some View {
-        Text("● \(status.displayLabel.uppercased())")
-            .font(.system(size: 10, weight: .bold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .foregroundStyle(foregroundColor)
-            .background(backgroundColor)
-            .clipShape(Capsule())
-    }
-
-    private var foregroundColor: Color {
-        switch status {
-        case .available: return FMSTheme.alertGreen
-        case .onTrip:    return FMSTheme.amber
-        case .offDuty:   return FMSTheme.textTertiary
-        }
-    }
-
-    private var backgroundColor: Color {
-        foregroundColor.opacity(0.15)
     }
 }

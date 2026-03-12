@@ -116,6 +116,22 @@ public final class DriversViewModel {
         }
     }
 
+    /// Count of drivers matching a given status (for filter chip badges).
+    public func driverCount(for status: DriverAvailabilityStatus?) -> Int {
+        guard let status else { return drivers.count }
+        return drivers.filter { $0.availabilityStatus == status }.count
+    }
+
+    /// On-duty drivers (for summary card).
+    public var onDutyCount: Int   { driverCount(for: .available) + driverCount(for: .onTrip) }
+    /// On-trip drivers.
+    public var onTripCount: Int   { driverCount(for: .onTrip) }
+    /// Off-duty drivers.
+    public var offDutyCount: Int  { driverCount(for: .offDuty) }
+    /// Total drivers.
+    public var totalCount: Int    { drivers.count }
+
+
     // MARK: - Computed: Shifts
 
     /// 6-day window for the date strip.
