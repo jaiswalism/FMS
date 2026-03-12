@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct AddVehicleView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(BannerManager.self) private var bannerManager
     var onAdd: @MainActor (Vehicle) async -> Bool
     
     @State private var plateNumber = ""
@@ -12,8 +13,6 @@ public struct AddVehicleView: View {
     @State private var tankCapacity = ""
     @State private var carryingCapacity = ""
     @State private var isSubmitting = false
-    @State private var errorMessage: String? = nil
-    @State private var showError = false
     
     private let fuelOptions = ["Diesel", "Petrol", "CNG", "Electric"]
     
@@ -37,6 +36,12 @@ public struct AddVehicleView: View {
                                     icon: "tag.fill",
                                     text: $plateNumber
                                 )
+                                .onChange(of: plateNumber) { newValue in
+                                    let normalized = normalizePlate(newValue)
+                                    if normalized != newValue {
+                                        plateNumber = normalized
+                                    }
+                                }
                                 
                                 FMSTextField(
                                     label: "Chassis Number",
@@ -44,6 +49,12 @@ public struct AddVehicleView: View {
                                     icon: "number",
                                     text: $chassisNumber
                                 )
+                                .onChange(of: chassisNumber) { newValue in
+                                    let normalized = normalizeChassis(newValue)
+                                    if normalized != newValue {
+                                        chassisNumber = normalized
+                                    }
+                                }
                             }
                             
                             // Section: Vehicle Details
@@ -93,7 +104,12 @@ public struct AddVehicleView: View {
                                         label: "Fuel Tank (L)",
                                         placeholder: "Liters",
                                         icon: "fuelpump.fill",
-                                        text: $tankCapacity
+                                        text: Binding(
+                                            get: { tankCapacity },
+                                            set: { newValue in
+                                                tankCapacity = newValue.filter { "0123456789.".contains($0) }
+                                            }
+                                        )
                                     )
                                     .keyboardType(.decimalPad)
                                     
@@ -101,7 +117,12 @@ public struct AddVehicleView: View {
                                         label: "Carrying (KG)",
                                         placeholder: "Kilograms",
                                         icon: "shippingbox.fill",
-                                        text: $carryingCapacity
+                                        text: Binding(
+                                            get: { carryingCapacity },
+                                            set: { newValue in
+                                                carryingCapacity = newValue.filter { "0123456789.".contains($0) }
+                                            }
+                                        )
                                     )
                                     .keyboardType(.decimalPad)
                                 }
@@ -150,13 +171,6 @@ public struct AddVehicleView: View {
                     .foregroundColor(FMSTheme.textSecondary)
                 }
             }
-            .alert(isPresented: $showError) {
-                Alert(
-                    title: Text("Validation Error"),
-                    message: Text(errorMessage ?? "Please check your inputs and try again."),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
         }
     }
     
@@ -175,44 +189,48 @@ public struct AddVehicleView: View {
         .shadow(color: FMSTheme.shadowSmall, radius: 8, x: 0, y: 4)
     }
     
+    private func normalizePlate(_ value: String) -> String {
+        value.uppercased().filter { $0.isLetter || $0.isNumber }
+    }
+    
+    private func normalizeChassis(_ value: String) -> String {
+        value.uppercased().filter { $0.isLetter || $0.isNumber }
+    }
+    
     @MainActor
     private func submitVehicle() {
         // Comprehensive validation
-        let trimmedPlate = plateNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPlate = plateNumber.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         if trimmedPlate.isEmpty {
-            errorMessage = "Plate Number is required."
-            showError = true
+            showValidationError("Plate Number is required.")
             return
         }
         
-        let trimmedChassis = chassisNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedChassis = chassisNumber.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         if trimmedChassis.isEmpty {
-            errorMessage = "Chassis Number is required."
-            showError = true
+            showValidationError("Chassis Number is required.")
             return
         }
         
-        if manufacturer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            errorMessage = "Manufacturer is required."
-            showError = true
+        let trimmedManufacturer = manufacturer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedManufacturer.isEmpty {
+            showValidationError("Manufacturer is required.")
             return
         }
         
-        if model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            errorMessage = "Model is required."
-            showError = true
+        let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedModel.isEmpty {
+            showValidationError("Model is required.")
             return
         }
         
         guard let validatedTankCapacity = Double(tankCapacity), validatedTankCapacity > 0 else {
-            errorMessage = "Please enter a valid Fuel Tank Capacity greater than 0."
-            showError = true
+            showValidationError("Please enter a valid Fuel Tank Capacity greater than 0.")
             return
         }
         
         guard let validatedCarryingCapacity = Double(carryingCapacity), validatedCarryingCapacity > 0 else {
-            errorMessage = "Please enter a valid Carrying Capacity greater than 0."
-            showError = true
+            showValidationError("Please enter a valid Carrying Capacity greater than 0.")
             return
         }
         
@@ -227,8 +245,8 @@ public struct AddVehicleView: View {
             id: UUID().uuidString,
             plateNumber: trimmedPlate,
             chassisNumber: trimmedChassis,
-            manufacturer: manufacturer.trimmingCharacters(in: .whitespacesAndNewlines),
-            model: model.trimmingCharacters(in: .whitespacesAndNewlines),
+            manufacturer: trimmedManufacturer,
+            model: trimmedModel,
             fuelType: fuelType.lowercased(),
             fuelTankCapacity: validatedTankCapacity,
             carryingCapacity: validatedCarryingCapacity,
@@ -247,11 +265,15 @@ public struct AddVehicleView: View {
                 if success {
                     dismiss()
                 } else {
-                    errorMessage = "Failed to add vehicle. Please try again."
-                    showError = true
+                    showValidationError("Plate Number or Chassis Number already exists.")
                 }
             }
         }
+    }
+    
+    @MainActor
+    private func showValidationError(_ message: String) {
+        bannerManager.show(type: .error, message: message)
     }
 }
 
