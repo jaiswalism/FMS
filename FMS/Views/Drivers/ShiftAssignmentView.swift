@@ -62,9 +62,9 @@ struct ShiftAssignmentView: View {
       Section {
         Button {
           guard !vm.isLoading && vm.isFormValid else { return }
+          vm.isLoading = true
 
           Task {
-            vm.isLoading = true
             defer { vm.isLoading = false }
 
             do {
