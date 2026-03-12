@@ -35,4 +35,15 @@ public struct FMSTheme {
     
     // Tab bar
     public static let tabInactive = Color(red: 180/255, green: 180/255, blue: 185/255)
+
+    // UI Element colors (used by LiveTripCard, LiveVehicleDashboardView etc.)
+    public static let pillBackground   = Color(red: 242/255, green: 242/255, blue: 247/255)
+    public static let symbolBackground = Color(red: 242/255, green: 242/255, blue: 247/255)
+    public static let symbolColor      = Color(red: 110/255, green: 110/255, blue: 120/255)
+
+    // Shadows
+    public static let shadowSmall  = Color.black.opacity(0.04)
+    public static let shadowMedium = Color.black.opacity(0.08)
+    public static let shadowLarge  = Color.black.opacity(0.14)
 }
+
