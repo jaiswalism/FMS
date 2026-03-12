@@ -123,4 +123,3 @@ public struct DriverDisplayItem: Codable, Identifiable, Hashable {
         self.activeTripId = activeTripId
     }
 }
-}
