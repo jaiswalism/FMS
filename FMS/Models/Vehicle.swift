@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Vehicle: Codable, Identifiable {
+public struct Vehicle: Codable, Identifiable, Equatable {
     public var id: String
     public var plateNumber: String
     public var chassisNumber: String
@@ -9,11 +9,18 @@ public struct Vehicle: Codable, Identifiable {
     public var fuelType: String
     public var fuelTankCapacity: Double
     public var carryingCapacity: Double?
-    public var purchaseDate: Date?
+    public var purchaseDateString: String?
     public var odometer: Double?
     public var status: String?
     public var createdBy: String?
-    public var createdAt: Date
+    public var createdAt: Date? // Changed to optional in case Supabase sends it differently, though it usually succeeds.
+    
+    public var purchaseDate: Date? {
+        guard let str = purchaseDateString else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: str)
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -24,7 +31,7 @@ public struct Vehicle: Codable, Identifiable {
         case fuelType = "fuel_type"
         case fuelTankCapacity = "fuel_tank_capacity"
         case carryingCapacity = "carrying_capacity"
-        case purchaseDate = "purchase_date"
+        case purchaseDateString = "purchase_date"
         case odometer
         case status
         case createdBy = "created_by"

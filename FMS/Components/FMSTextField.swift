@@ -33,20 +33,22 @@ public struct FMSTextField: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(label.uppercased())
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(FMSTheme.textSecondary)
-                    .tracking(0.5)
-                
-                Spacer()
-                
-                if let trailingLabel = trailingLabel, let trailingAction = trailingAction {
-                    Button(trailingLabel) {
-                        trailingAction()
+            if !label.isEmpty {
+                HStack {
+                    Text(label.uppercased())
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(FMSTheme.textSecondary)
+                        .tracking(0.5)
+                    
+                    Spacer()
+                    
+                    if let trailingLabel = trailingLabel, let trailingAction = trailingAction {
+                        Button(trailingLabel) {
+                            trailingAction()
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(FMSTheme.amber)
                     }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(FMSTheme.amber)
                 }
             }
             

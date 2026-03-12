@@ -13,7 +13,7 @@ public struct FleetManagerDashboardView: View {
             
             // Fleet Tab
             FMSTabItem(id: "fleet", title: "Fleet", icon: "truck.box.fill") {
-                Text("Fleet")
+                FleetManagementView()
             }
             
             // Drivers Tab

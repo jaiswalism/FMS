@@ -42,7 +42,6 @@ final class LiveVehicleViewModel {
         do {
             try await Task.sleep(nanoseconds: 500_000_000)
             
-            // Mock data strictly matching your standard
             self.vehicles = [
                 Vehicle(
                     id: UUID().uuidString,
@@ -51,12 +50,12 @@ final class LiveVehicleViewModel {
                     manufacturer: "Volvo",
                     model: "FH16",
                     fuelType: "Diesel",
-                    fuelTankCapacity: 400,
-                    carryingCapacity: nil,
-                    purchaseDate: nil,
-                    odometer: nil,
+                    fuelTankCapacity: 400.0,
+                    carryingCapacity: 35000.0,
+                    purchaseDateString: nil,
+                    odometer: 12540.0,
                     status: "active",
-                    createdBy: nil,
+                    createdBy: "admin",
                     createdAt: Date()
                 ),
                 
@@ -67,12 +66,12 @@ final class LiveVehicleViewModel {
                     manufacturer: "Tata",
                     model: "Prima",
                     fuelType: "Diesel",
-                    fuelTankCapacity: 350,
-                    carryingCapacity: nil,
-                    purchaseDate: nil,
-                    odometer: nil,
+                    fuelTankCapacity: 350.0,
+                    carryingCapacity: 30000.0,
+                    purchaseDateString: nil,
+                    odometer: 25000.0,
                     status: "active",
-                    createdBy: nil,
+                    createdBy: "admin",
                     createdAt: Date()
                 ),
                 
@@ -82,13 +81,13 @@ final class LiveVehicleViewModel {
                     chassisNumber: "CH9012",
                     manufacturer: "Ashok Leyland",
                     model: "Boss",
-                    fuelType: "Diesel",
-                    fuelTankCapacity: 300,
-                    carryingCapacity: nil,
-                    purchaseDate: nil,
-                    odometer: nil,
+                    fuelType: "Electric",
+                    fuelTankCapacity: 0.0,
+                    carryingCapacity: 28000.0,
+                    purchaseDateString: nil,
+                    odometer: 3200.0,
                     status: "inactive",
-                    createdBy: nil,
+                    createdBy: "admin",
                     createdAt: Date()
                 ),
                 
@@ -99,12 +98,12 @@ final class LiveVehicleViewModel {
                     manufacturer: "Eicher",
                     model: "Pro",
                     fuelType: "Diesel",
-                    fuelTankCapacity: 250,
-                    carryingCapacity: nil,
-                    purchaseDate: nil,
-                    odometer: nil,
+                    fuelTankCapacity: 350.0,
+                    carryingCapacity: 32000.0,
+                    purchaseDateString: nil,
+                    odometer: 8400.0,
                     status: "maintenance",
-                    createdBy: nil,
+                    createdBy: "admin",
                     createdAt: Date()
                 )
             ]
