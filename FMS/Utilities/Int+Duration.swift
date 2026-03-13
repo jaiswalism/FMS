@@ -1,7 +1,10 @@
 extension Int {
     var formattedDuration: String {
-        let hours = self / 60
-        let minutes = self % 60
-        return "\(hours)h \(minutes)m"
+        let sign = self < 0 ? "-" : ""
+        let totalMinutes = self.magnitude
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        return "\(sign)\(hours)h \(minutes)m"
+    }
     }
 }
