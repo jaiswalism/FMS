@@ -92,7 +92,15 @@ public struct FleetManagementView: View {
                 }
             }
             .navigationDestination(item: $selectedVehicle) { vehicle in
-                VehicleDetailView(vehicle: vehicle)
+                VehicleDetailView(
+                    vehicle: vehicle,
+                    onUpdate: { updatedVehicle in
+                        try await viewModel.updateVehicle(updatedVehicle)
+                    },
+                    onDelete: { vehicleId in
+                        try await viewModel.deleteVehicle(id: vehicleId)
+                    }
+                )
             }
         }
     }
@@ -147,15 +155,8 @@ public struct FleetManagementView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(
-            Group {
-                if #available(iOS 26, *) {
-                    FMSTheme.cardBackground.opacity(0.5)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
-                } else {
-                    FMSTheme.cardBackground.opacity(0.5)
-                        .background(.ultraThinMaterial)
-                }
-            }
+            FMSTheme.cardBackground.opacity(0.5)
+                .background(.ultraThinMaterial)
         )
         .cornerRadius(12)
         .overlay(
@@ -250,14 +251,8 @@ struct FilterPill: View {
                     if isSelected {
                         FMSTheme.amber
                     } else {
-                        if #available(iOS 26, *) {
-                            FMSTheme.cardBackground.opacity(0.5)
-                                .glassEffect(.regular.interactive(), in: .capsule)
-                        } else {
-                            // Liquid glass effect fallback
-                            FMSTheme.cardBackground.opacity(0.5)
-                                .background(.ultraThinMaterial)
-                        }
+                        FMSTheme.cardBackground.opacity(0.5)
+                            .background(.ultraThinMaterial)
                     }
                 }
             )

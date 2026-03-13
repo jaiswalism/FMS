@@ -1,11 +1,24 @@
 import SwiftUI
 
 public struct VehicleDetailView: View {
-    let vehicle: Vehicle
+    @Environment(\.dismiss) private var dismiss
+    @Environment(BannerManager.self) private var bannerManager
+    @State private var currentVehicle: Vehicle
     @State private var viewModel = VehicleDetailViewModel()
+    private let onUpdate: (@MainActor (Vehicle) async throws -> Void)?
+    private let onDelete: (@MainActor (String) async throws -> Void)?
+    @State private var showingEditVehicle = false
+    @State private var showingDeleteConfirm = false
+    @State private var isDeleting = false
     
-    public init(vehicle: Vehicle) {
-        self.vehicle = vehicle
+    public init(
+        vehicle: Vehicle,
+        onUpdate: (@MainActor (Vehicle) async throws -> Void)? = nil,
+        onDelete: (@MainActor (String) async throws -> Void)? = nil
+    ) {
+        _currentVehicle = State(initialValue: vehicle)
+        self.onUpdate = onUpdate
+        self.onDelete = onDelete
     }
     
     public var body: some View {
@@ -26,13 +39,53 @@ public struct VehicleDetailView: View {
                 .padding(.bottom, 24)
             }
         }
-        .navigationTitle(vehicle.plateNumber)
+        .navigationTitle(currentVehicle.plateNumber)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if onUpdate != nil || onDelete != nil {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        if onUpdate != nil {
+                            Button("Edit Vehicle") {
+                                showingEditVehicle = true
+                            }
+                        }
+                        if onDelete != nil {
+                            Button(role: .destructive) {
+                                showingDeleteConfirm = true
+                            } label: {
+                                Text("Delete Vehicle")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(FMSTheme.textSecondary)
+                    }
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             bottomActions
         }
         .task {
-            await viewModel.fetch(vehicleId: vehicle.id)
+            await viewModel.fetch(vehicleId: currentVehicle.id)
+        }
+        .sheet(isPresented: $showingEditVehicle) {
+            AddVehicleView(vehicle: currentVehicle) { updatedVehicle in
+                guard let onUpdate else { return }
+                try await onUpdate(updatedVehicle)
+                await MainActor.run {
+                    currentVehicle = updatedVehicle
+                }
+            }
+        }
+        .alert("Delete Vehicle?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                Task { await deleteVehicle() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently remove \(currentVehicle.plateNumber) and its related records.")
         }
     }
     
@@ -44,11 +97,11 @@ public struct VehicleDetailView: View {
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(FMSTheme.textPrimary)
                     
-                    Text(vehicle.plateNumber)
+                    Text(currentVehicle.plateNumber)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(FMSTheme.textSecondary)
                     
-                    Text("VIN: \(vehicle.chassisNumber)")
+                    Text("VIN: \(currentVehicle.chassisNumber)")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(FMSTheme.textSecondary)
                 }
@@ -57,9 +110,9 @@ public struct VehicleDetailView: View {
                 
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(FMSTheme.statusColor(for: vehicle.status ?? ""))
+                        .fill(FMSTheme.statusColor(for: currentVehicle.status ?? ""))
                         .frame(width: 8, height: 8)
-                    Text((vehicle.status ?? "Unknown").uppercased())
+                    Text((currentVehicle.status ?? "Unknown").uppercased())
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(FMSTheme.textSecondary)
                 }
@@ -72,10 +125,10 @@ public struct VehicleDetailView: View {
             Divider()
                 .overlay(FMSTheme.borderLight)
             
-            detailRow(title: "Make", value: vehicle.manufacturer ?? "Unknown")
-            detailRow(title: "Model", value: vehicle.model ?? "Unknown")
-            detailRow(title: "Fuel Type", value: vehicle.fuelType.capitalized)
-            detailRow(title: "Fuel Tank", value: "\(Int(vehicle.fuelTankCapacity)) L")
+            detailRow(title: "Make", value: currentVehicle.manufacturer ?? "Unknown")
+            detailRow(title: "Model", value: currentVehicle.model ?? "Unknown")
+            detailRow(title: "Fuel Type", value: currentVehicle.fuelType.capitalized)
+            detailRow(title: "Fuel Tank", value: "\(Int(currentVehicle.fuelTankCapacity)) L")
             detailRow(title: "Carrying Capacity", value: capacityText)
             detailRow(title: "Odometer", value: odometerText)
         }
@@ -406,19 +459,19 @@ public struct VehicleDetailView: View {
     }
     
     private var vehicleName: String {
-        let make = vehicle.manufacturer ?? ""
-        let model = vehicle.model ?? ""
+        let make = currentVehicle.manufacturer ?? ""
+        let model = currentVehicle.model ?? ""
         let fullName = "\(make) \(model)".trimmingCharacters(in: .whitespaces)
         return fullName.isEmpty ? "Unknown Vehicle" : fullName
     }
     
     private var capacityText: String {
-        guard let capacity = vehicle.carryingCapacity else { return "Unknown" }
+        guard let capacity = currentVehicle.carryingCapacity else { return "Unknown" }
         return "\(Int(capacity)) kg"
     }
     
     private var odometerText: String {
-        guard let odometer = vehicle.odometer else { return "Unknown" }
+        guard let odometer = currentVehicle.odometer else { return "Unknown" }
         return "\(Int(odometer)) km"
     }
     
@@ -650,6 +703,20 @@ public struct VehicleDetailView: View {
         let parts = cleaned.split(separator: " ")
         if parts.isEmpty { return value }
         return parts.map { $0.capitalized }.joined(separator: " ")
+    }
+
+    @MainActor
+    private func deleteVehicle() async {
+        guard !isDeleting else { return }
+        guard let onDelete else { return }
+        isDeleting = true
+        do {
+            try await onDelete(currentVehicle.id)
+            dismiss()
+        } catch {
+            bannerManager.show(type: .error, message: "Failed to delete vehicle. Please try again.")
+        }
+        isDeleting = false
     }
 }
 

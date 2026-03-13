@@ -93,6 +93,40 @@ public class FleetViewModel {
             throw mapAddVehicleError(error)
         }
     }
+
+    @MainActor
+    public func updateVehicle(_ vehicle: Vehicle) async throws {
+        do {
+            try await SupabaseService.shared.client
+                .from("vehicles")
+                .update(vehicle)
+                .eq("id", value: vehicle.id)
+                .execute()
+            
+            try await fetchVehicles()
+        } catch {
+            self.errorMessage = error.localizedDescription
+            print("Error updating vehicle: \(error)")
+            throw mapAddVehicleError(error)
+        }
+    }
+
+    @MainActor
+    public func deleteVehicle(id: String) async throws {
+        do {
+            try await SupabaseService.shared.client
+                .from("vehicles")
+                .delete()
+                .eq("id", value: id)
+                .execute()
+            
+            try await fetchVehicles()
+        } catch {
+            self.errorMessage = error.localizedDescription
+            print("Error deleting vehicle: \(error)")
+            throw error
+        }
+    }
     
     private func mapAddVehicleError(_ error: Error) -> AddVehicleError {
         let message = error.localizedDescription.lowercased()

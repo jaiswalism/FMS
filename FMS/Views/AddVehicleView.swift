@@ -1,9 +1,20 @@
 import SwiftUI
 
 public struct AddVehicleView: View {
+    private enum FormMode {
+        case add
+        case edit
+    }
+    
     @Environment(\.dismiss) private var dismiss
     @Environment(BannerManager.self) private var bannerManager
-    var onAdd: @MainActor (Vehicle) async throws -> Void
+    private let mode: FormMode
+    private let onSubmit: @MainActor (Vehicle) async throws -> Void
+    private let existingVehicleId: String?
+    private let existingStatus: String?
+    private let existingCreatedBy: String?
+    private let existingCreatedAt: Date?
+    private let existingPurchaseDateString: String?
     
     @State private var plateNumber = ""
     @State private var chassisNumber = ""
@@ -18,7 +29,32 @@ public struct AddVehicleView: View {
     private let fuelOptions = ["Diesel", "Petrol", "CNG", "Electric"]
     
     public init(onAdd: @escaping @MainActor (Vehicle) async throws -> Void) {
-        self.onAdd = onAdd
+        self.mode = .add
+        self.onSubmit = onAdd
+        self.existingVehicleId = nil
+        self.existingStatus = nil
+        self.existingCreatedBy = nil
+        self.existingCreatedAt = nil
+        self.existingPurchaseDateString = nil
+    }
+
+    public init(vehicle: Vehicle, onUpdate: @escaping @MainActor (Vehicle) async throws -> Void) {
+        self.mode = .edit
+        self.onSubmit = onUpdate
+        self.existingVehicleId = vehicle.id
+        self.existingStatus = vehicle.status
+        self.existingCreatedBy = vehicle.createdBy
+        self.existingCreatedAt = vehicle.createdAt
+        self.existingPurchaseDateString = vehicle.purchaseDateString
+        _plateNumber = State(initialValue: vehicle.plateNumber)
+        _chassisNumber = State(initialValue: vehicle.chassisNumber)
+        _manufacturer = State(initialValue: vehicle.manufacturer ?? "")
+        _model = State(initialValue: vehicle.model ?? "")
+        let fuel = vehicle.fuelType.capitalized
+        _fuelType = State(initialValue: fuelOptions.contains(fuel) ? fuel : "Diesel")
+        _tankCapacity = State(initialValue: vehicle.fuelTankCapacity > 0 ? Int(vehicle.fuelTankCapacity) : nil)
+        _carryingCapacity = State(initialValue: vehicle.carryingCapacity.flatMap { $0 > 0 ? Int($0) : nil })
+        _odometer = State(initialValue: vehicle.odometer.flatMap { $0 >= 0 ? Int($0) : nil })
     }
     
     public var body: some View {
@@ -145,7 +181,7 @@ public struct AddVehicleView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: FMSTheme.obsidian))
                                 } else {
-                                    Text("Add Vehicle to Fleet")
+                                    Text(primaryActionTitle)
                                         .font(.system(size: 17, weight: .bold))
                                 }
                             }
@@ -164,7 +200,7 @@ public struct AddVehicleView: View {
                     .background(FMSTheme.backgroundPrimary)
                 }
             }
-            .navigationTitle("New Vehicle")
+            .navigationTitle(mode == .add ? "New Vehicle" : "Edit Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -329,7 +365,7 @@ public struct AddVehicleView: View {
         isSubmitting = true
         
         let vehicle = Vehicle(
-            id: UUID().uuidString,
+            id: existingVehicleId ?? UUID().uuidString,
             plateNumber: trimmedPlate,
             chassisNumber: trimmedChassis,
             manufacturer: trimmedManufacturer,
@@ -337,16 +373,16 @@ public struct AddVehicleView: View {
             fuelType: fuelType.lowercased(),
             fuelTankCapacity: Double(validatedTankCapacity),
             carryingCapacity: Double(validatedCarryingCapacity),
-            purchaseDateString: nil,
+            purchaseDateString: existingPurchaseDateString,
             odometer: Double(validatedOdometer),
-            status: "inactive",
-            createdBy: nil, 
-            createdAt: nil
+            status: existingStatus ?? "inactive",
+            createdBy: existingCreatedBy,
+            createdAt: existingCreatedAt
         )
         
         Task {
             do {
-                try await onAdd(vehicle)
+                try await onSubmit(vehicle)
                 await MainActor.run {
                     isSubmitting = false
                     dismiss()
@@ -377,6 +413,10 @@ public struct AddVehicleView: View {
     @MainActor
     private func showValidationError(_ message: String) {
         bannerManager.show(type: .error, message: message)
+    }
+
+    private var primaryActionTitle: String {
+        mode == .add ? "Add Vehicle to Fleet" : "Save Changes"
     }
 }
 

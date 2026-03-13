@@ -16,7 +16,6 @@ public class VehicleDetailViewModel {
     public var assignmentsErrorMessage: String? = nil
     public var workOrdersErrorMessage: String? = nil
     public var incidentsErrorMessage: String? = nil
-    
     public init() {}
     
     @MainActor
