@@ -175,8 +175,16 @@ struct WODetailView: View {
                                                 do {
                                                     if let p = invStore.parts.first(where: { $0.id.uuidString.lowercased() == matchedPartId.lowercased() }) {
                                                         try await invStore.reorder(part: p, quantity: qtyToRestore)
+                                                        do {
+                                                            try await store.removePartUsed(pId, from: wId)
+                                                        } catch {
+                                                            // Roll back the stock restore since removePartUsed failed
+                                                            try? await invStore.reorder(part: p, quantity: -qtyToRestore)
+                                                            throw error
+                                                        }
+                                                    } else {
+                                                        try await store.removePartUsed(pId, from: wId)
                                                     }
-                                                    try await store.removePartUsed(pId, from: wId)
                                                     await MainActor.run {
                                                         wo.partsUsed.removeAll { $0.id == pId }
                                                     }
@@ -303,7 +311,13 @@ struct WODetailView: View {
                                             Task {
                                                 do {
                                                     try await invStore.reorder(part: selectedItem, quantity: -qty)
-                                                    try await store.addPartUsed(part, to: wo.id)
+                                                    do {
+                                                        try await store.addPartUsed(part, to: wo.id)
+                                                    } catch {
+                                                        // Roll back the stock deduction since addPartUsed failed
+                                                        try? await invStore.reorder(part: selectedItem, quantity: qty)
+                                                        throw error
+                                                    }
                                                     await MainActor.run {
                                                         withAnimation { wo.partsUsed.append(part) }
                                                         // Reset
@@ -489,4 +503,3 @@ private struct WDStatCard: View {
             .stroke(FMSTheme.borderLight.opacity(colorScheme == .dark ? 0.15 : 1), lineWidth: 1))
     }
 }
-

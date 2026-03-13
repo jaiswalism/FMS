@@ -172,7 +172,8 @@ class DefectStore {
 
         await MainActor.run {
             if let first = inserted.first {
-                let newItem = DefectItem(from: first)
+                var newItem = DefectItem(from: first)
+                newItem.vehicleDisplay = item.vehicleDisplay
                 self.defects.insert(newItem, at: 0)
             }
         }

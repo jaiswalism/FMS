@@ -185,6 +185,12 @@ class WorkOrderStore {
         }
     }
 
+    // Resolve a human-friendly vehicle label from the already-fetched orders cache
+    private func resolvedVehicleLabel(for vehicleId: String?) -> String? {
+        guard let vehicleId else { return nil }
+        return orders.first(where: { $0.vehicleIdRaw == vehicleId })?.vehicle
+    }
+
     // Accept a real MaintenanceWorkOrder → convert + insert
     func add(_ wo: MaintenanceWorkOrder) async throws -> MaintenanceWorkOrder {
         let inserted: MaintenanceWorkOrder = try await SupabaseService.shared.client
@@ -196,7 +202,10 @@ class WorkOrderStore {
             .value
             
         await MainActor.run {
-            let item = WOItem(from: inserted)
+            var item = WOItem(from: inserted)
+            if let label = resolvedVehicleLabel(for: inserted.vehicleId) {
+                item.vehicle = label
+            }
             orders.insert(item, at: 0)
         }
         
@@ -215,7 +224,8 @@ class WorkOrderStore {
             .value
             
         await MainActor.run {
-            let fetchedItem = WOItem(from: inserted)
+            var fetchedItem = WOItem(from: inserted)
+            fetchedItem.vehicle = resolvedVehicleLabel(for: inserted.vehicleId) ?? item.vehicle
             orders.insert(fetchedItem, at: 0)
         }
         

@@ -7,7 +7,6 @@ struct EditPartView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var name       = ""
-    @State private var partNumber = ""
     @State private var stock      = ""
     @State private var minStock   = ""
     @State private var unitCost   = ""
@@ -25,8 +24,6 @@ struct EditPartView: View {
                         EPFormCard {
                             VStack(alignment: .leading, spacing: 16) {
                                 EPField(label: "PART NAME", placeholder: "e.g. Oil Filter", text: $name, icon: "cube.box.fill")
-                                Divider().opacity(0.4)
-                                EPField(label: "PART NUMBER", placeholder: "e.g. PN-502-A", text: $partNumber, icon: "number")
                             }
                         }
 
@@ -67,10 +64,28 @@ struct EditPartView: View {
                         Button {
                             var updatedPart = part
                             updatedPart.name = name.isEmpty ? updatedPart.name : name
-                            updatedPart.partNumber = partNumber.isEmpty ? updatedPart.partNumber : partNumber
-                            if let s = Int(stock) { updatedPart.stock = s }
-                            if let m = Int(minStock) { updatedPart.minStock = m }
+                            if let s = Int(stock) {
+                                guard s >= 0 else {
+                                    updateError = "Stock cannot be negative."
+                                    showUpdateError = true
+                                    return
+                                }
+                                updatedPart.stock = s
+                            }
+                            if let m = Int(minStock) {
+                                guard m >= 0 else {
+                                    updateError = "Minimum threshold cannot be negative."
+                                    showUpdateError = true
+                                    return
+                                }
+                                updatedPart.minStock = m
+                            }
                             if let c = Double(unitCost) {
+                                guard c >= 0 else {
+                                    updateError = "Unit cost cannot be negative."
+                                    showUpdateError = true
+                                    return
+                                }
                                 updatedPart.unitCost = c
                             } else if unitCost.trimmingCharacters(in: .whitespaces).isEmpty {
                                 updatedPart.unitCost = nil
@@ -112,7 +127,6 @@ struct EditPartView: View {
             }
             .onAppear {
                 name = part.name
-                partNumber = part.partNumber
                 stock = "\(part.stock)"
                 minStock = "\(part.minStock)"
                 unitCost = part.unitCost.map { String(format: "%.2f", $0) } ?? ""

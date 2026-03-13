@@ -179,13 +179,10 @@ struct PartDetailView: View {
                                         guard adjustQty != 0 else { return }
                                         Task {
                                             do {
-                                                let newStock = max(0, part.stock + adjustQty)
-                                                var updatedPart = part
-                                                updatedPart.stock = newStock
-                                                try await store.updatePart(updatedPart)
-                                                await MainActor.run { 
-                                                    part.stock = newStock
-                                                    adjustQty = 0 
+                                                try await store.reorder(part: part, quantity: adjustQty)
+                                                await MainActor.run {
+                                                    part.stock = max(0, part.stock + adjustQty)
+                                                    adjustQty = 0
                                                 }
                                             } catch {
                                                 await MainActor.run {

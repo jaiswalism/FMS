@@ -155,7 +155,11 @@ public struct ProfileTabView: View {
     private var logoutButton: some View {
         Button {
             Task {
-                await authViewModel.logout()
+                do {
+                    try await authViewModel.logout()
+                } catch {
+                    print("Logout error: \(error)")
+                }
             }
         } label: {
             HStack(spacing: 8) {

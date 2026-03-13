@@ -236,8 +236,14 @@ struct DefectCardView: View {
         .sheet(isPresented: $showingCreateWO) {
             CreateWorkOrderView(prefillVehicle: defect.vehicleId) { newWO in
                 let insertedWO = try await woStore.addItem(WOItem(from: newWO))
-                // Use atomic link API explicitly
-                try await store.linkWorkOrder(defectId: defect.id, workOrderId: insertedWO.id)
+                do {
+                    // Use atomic link API explicitly
+                    try await store.linkWorkOrder(defectId: defect.id, workOrderId: insertedWO.id)
+                } catch {
+                    // Roll back the orphaned WO before propagating the error
+                    try? await woStore.delete(id: insertedWO.id)
+                    throw error
+                }
                 await MainActor.run {
                     defect.linkedWorkOrderId = insertedWO.id
                     defect.status = "in_progress"

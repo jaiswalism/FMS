@@ -20,6 +20,11 @@ struct ReportDefectView: View {
     @State private var showingVehiclePicker = false
     @State private var loadingVehicles      = false
 
+    // Submit state
+    @State private var isSubmitting         = false
+    @State private var showSubmitError      = false
+    @State private var submitErrorMessage: String? = nil
+
     // DB-compatible categories (must match defects_category_check constraint)
     let categories: [(display: String, value: String)] = [
         ("Mechanical",  "mechanical"),
@@ -153,15 +158,19 @@ struct ReportDefectView: View {
 
                         Button(action: submit) {
                             HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 16))
+                                if isSubmitting {
+                                    ProgressView().tint(.black).scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 16))
+                                }
                                 Text("Report Defect").font(.system(size: 16, weight: .bold))
                             }
-                            .foregroundColor(canSubmit ? .black : FMSTheme.textSecondary)
+                            .foregroundColor(canSubmit && !isSubmitting ? .black : FMSTheme.textSecondary)
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
-                            .background(canSubmit ? FMSTheme.amber : Color.gray.opacity(0.15)).cornerRadius(14)
+                            .background(canSubmit && !isSubmitting ? FMSTheme.amber : Color.gray.opacity(0.15)).cornerRadius(14)
                         }
-                        .disabled(!canSubmit)
-                        .animation(.easeInOut(duration: 0.2), value: canSubmit)
+                        .disabled(!canSubmit || isSubmitting)
+                        .animation(.easeInOut(duration: 0.2), value: canSubmit || isSubmitting)
                     }
                     .padding(16)
                 }
@@ -173,6 +182,11 @@ struct ReportDefectView: View {
                 }
             }
             .task { await loadVehicles() }
+            .alert("Submission Error", isPresented: $showSubmitError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(submitErrorMessage ?? "An unknown error occurred.")
+            }
         }
         // Vehicle picker sheet
         .sheet(isPresented: $showingVehiclePicker) {
@@ -205,21 +219,31 @@ struct ReportDefectView: View {
     }
 
     private func submit() {
+        guard !isSubmitting else { return }
         let trimmedTitle = defectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let newDefect = DefectItem(
             title:       trimmedTitle,
             vehicleId:   selectedVehicleId,   // store UUID in vehicle field (maps to vehicle_id in DB)
+            vehicleDisplay: selectedPlate,
             category:    selectedCategory,
             priority:    selectedPriority,
             description: description,
             reportedAt:  Date()
         )
+        isSubmitting = true
         Task {
             do {
                 try await store.addDefect(newDefect)
-                await MainActor.run { dismiss() }
+                await MainActor.run {
+                    isSubmitting = false
+                    dismiss()
+                }
             } catch {
-                print("Error saving defect: \(error)")
+                await MainActor.run {
+                    isSubmitting = false
+                    submitErrorMessage = error.localizedDescription
+                    showSubmitError = true
+                }
             }
         }
     }

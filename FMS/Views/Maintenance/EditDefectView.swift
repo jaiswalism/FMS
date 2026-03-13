@@ -87,14 +87,18 @@ struct EditDefectView: View {
 
                         Button {
                             guard !title.isEmpty else { return }
-                            defect.title       = title
-                            defect.category    = category
-                            defect.priority    = priority
-                            defect.description = description
+                            var updated = defect
+                            updated.title       = title
+                            updated.category    = category
+                            updated.priority    = priority
+                            updated.description = description
                             Task {
                                 do {
-                                    try await store.updateDefect(defect)
-                                    await MainActor.run { dismiss() }
+                                    try await store.updateDefect(updated)
+                                    await MainActor.run {
+                                        defect = updated
+                                        dismiss()
+                                    }
                                 } catch {
                                     await MainActor.run {
                                         updateError = error.localizedDescription

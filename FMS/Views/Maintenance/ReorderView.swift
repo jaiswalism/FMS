@@ -9,6 +9,8 @@ struct ReorderPartView: View {
 
     @State private var qtyString = ""
     @State private var confirmed = false
+    @State private var showReorderError = false
+    @State private var reorderErrorMessage: String = ""
 
     private var qty: Int { Int(qtyString) ?? 0 }
     private var canOrder: Bool { qty > 0 }
@@ -115,7 +117,8 @@ struct ReorderPartView: View {
                                 try await store.reorder(part: part, quantity: qty)
                                 await MainActor.run { dismiss() }
                             } catch {
-                                print("Error reordering part: \(error)")
+                                reorderErrorMessage = error.localizedDescription
+                                await MainActor.run { showReorderError = true }
                             }
                         }
                     } label: {
@@ -141,6 +144,11 @@ struct ReorderPartView: View {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(FMSTheme.textSecondary)
                 }
+            }
+            .alert("Order Error", isPresented: $showReorderError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(reorderErrorMessage)
             }
         }
     }

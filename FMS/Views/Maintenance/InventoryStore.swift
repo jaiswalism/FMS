@@ -6,7 +6,7 @@ import PostgREST
 struct PartItem: Identifiable {
     var id:        UUID
     var name:      String
-    var partNumber: String    // stored in `id` field of PartsInventory (or derived)
+    var partNumber: String { id.uuidString.prefix(8).uppercased() }   // derived-only, not editable
     var stock:     Int
     var minStock:  Int        // maps to PartsInventory.threshold
     var unitCost:  Double?
@@ -21,7 +21,6 @@ struct PartItem: Identifiable {
         let assignedId = part.id ?? UUID()
         self.id          = assignedId
         self.name        = part.name ?? "Unknown Part"
-        self.partNumber  = assignedId.uuidString.prefix(8).uppercased() // derive a display part number from UUID
         self.stock       = part.stock ?? 0
         self.minStock    = part.threshold ?? 0
         self.unitCost    = part.unitCost
@@ -46,7 +45,6 @@ struct PartItem: Identifiable {
          unitCost: Double? = nil, imageName: String, lastUpdated: Date? = nil) {
         self.id          = id
         self.name        = name
-        self.partNumber  = partNumber
         self.stock       = stock
         self.minStock    = minStock
         self.unitCost    = unitCost
@@ -183,4 +181,3 @@ class InventoryStore {
         }
     }
 }
-
