@@ -6,5 +6,4 @@ extension Int {
         let minutes = totalMinutes % 60
         return "\(sign)\(hours)h \(minutes)m"
     }
-    }
 }

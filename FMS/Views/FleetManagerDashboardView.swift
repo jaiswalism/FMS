@@ -33,6 +33,7 @@ struct FleetManagerHomeTab: View {
     @State private var navigateToLiveFleet = false
     @State private var navigateToPreTrip = false
     @State private var navigateToPostTrip = false
+    @State private var navigateToProfile = false
 
     // Mock data
     private let managerName = "Manager"
@@ -84,8 +85,6 @@ struct FleetManagerHomeTab: View {
             .navigationDestination(isPresented: $navigateToLiveFleet) {
                 LiveVehicleDashboardView()
             }
- 
-            }
         }
     }
     
@@ -127,7 +126,8 @@ struct FleetManagerHomeTab: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(FMSTheme.textPrimary)
             
-            ForEach(Array(alerts.enumerated()), id: \.offset) { index, alert in
+            ForEach(alerts.indices, id: \.self) { index in
+                let alert = alerts[index]
                 AlertRow(
                     title: alert.title,
                     subtitle: alert.subtitle,

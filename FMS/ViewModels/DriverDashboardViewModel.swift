@@ -37,6 +37,7 @@ public enum TripSegment: String, CaseIterable {
 
 // MARK: - Data Source Protocol
 
+@MainActor
 public protocol DriverDashboardDataSource {
     func fetchCurrentDriver() -> DriverDisplayItem
     func fetchAssignedVehicle() -> Vehicle?
@@ -189,7 +190,7 @@ public final class DriverDashboardViewModel {
 // MARK: - Mock Data Source
 
 public final class MockDriverDashboardDataSource: DriverDashboardDataSource {
-    public init() {}
+    public nonisolated init() {}
 
     public func fetchCurrentDriver() -> DriverDisplayItem {
         let now = Date()
