@@ -15,7 +15,7 @@ struct DriverCardView: View {
       statusRail
       cardContent
     }
-    .background(Color(.secondarySystemGroupedBackground))
+    .background(FMSTheme.cardBackground)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
@@ -36,7 +36,7 @@ struct DriverCardView: View {
 
       Text("ID: \(driver.employeeID)")
         .font(.footnote)
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
 
       if let vName = driver.vehicleDisplayName, let plate = driver.plateNumber {
         VehicleRow(vehicleName: vName, plate: plate)
@@ -57,7 +57,7 @@ struct DriverCardView: View {
     switch driver.availabilityStatus {
     case .available: return FMSTheme.alertGreen
     case .onTrip: return FMSTheme.amber
-    case .offDuty: return Color(.tertiaryLabel)
+    case .offDuty: return FMSTheme.textTertiary
     }
   }
 }
@@ -75,7 +75,7 @@ struct DriverShiftCardView: View {
       statusRail
       cardContent
     }
-    .background(Color(.secondarySystemGroupedBackground))
+    .background(FMSTheme.cardBackground)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
@@ -108,8 +108,8 @@ struct DriverShiftCardView: View {
     switch shift.status {
     case "on_duty": return FMSTheme.alertGreen
     case "break": return FMSTheme.amber
-    case "not_started": return Color(.tertiaryLabel)
-    default: return Color(.separator)
+    case "not_started": return FMSTheme.textTertiary
+    default: return FMSTheme.borderLight
     }
   }
 }
@@ -126,7 +126,7 @@ struct DriverNameRow: View {
     HStack {
       Text(name)
         .font(.headline)
-        .foregroundStyle(Color(.label))
+        .foregroundStyle(FMSTheme.textPrimary)
       Spacer(minLength: 8)
       StatusBadge(status: status)
     }
@@ -142,7 +142,7 @@ private struct ShiftNameRow: View {
     HStack {
       Text(name)
         .font(.headline)
-        .foregroundStyle(Color(.label))
+        .foregroundStyle(FMSTheme.textPrimary)
       Spacer(minLength: 8)
       ShiftStatusChip(status: status, label: label)
     }
@@ -157,16 +157,16 @@ struct VehicleRow: View {
     HStack(spacing: 6) {
       Image(systemName: "truck.box.fill")
         .font(.caption)
-        .foregroundStyle(Color(.tertiaryLabel))
+        .foregroundStyle(FMSTheme.textTertiary)
       Text(vehicleName)
         .font(.subheadline)
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
       Text("·")
         .font(.caption)
-        .foregroundStyle(Color(.tertiaryLabel))
+        .foregroundStyle(FMSTheme.textTertiary)
       Text(plate)
         .font(.subheadline.weight(.medium))
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
     }
   }
 }
@@ -179,16 +179,16 @@ private struct ShiftTimingRow: View {
     HStack(spacing: 6) {
       Image(systemName: "clock")
         .font(.caption)
-        .foregroundStyle(Color(.tertiaryLabel))
+        .foregroundStyle(FMSTheme.textTertiary)
       Text(formatted(start))
         .font(.subheadline)
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
       Image(systemName: "arrow.right")
         .font(.caption2)
-        .foregroundStyle(Color(.tertiaryLabel))
+        .foregroundStyle(FMSTheme.textTertiary)
       Text(formatted(end))
         .font(.subheadline)
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
     }
   }
 
@@ -211,11 +211,11 @@ struct ShiftProgressRow: View {
       HStack {
         Text("SHIFT PROGRESS")
           .font(.caption2.weight(.bold))
-          .foregroundStyle(Color(.tertiaryLabel))
+          .foregroundStyle(FMSTheme.textTertiary)
         Spacer()
         Text(label)
           .font(.caption.weight(.semibold))
-          .foregroundStyle(Color(.label))
+          .foregroundStyle(FMSTheme.textPrimary)
       }
       ThickProgressBar(progress: progress, tint: FMSTheme.amber)
     }
@@ -231,7 +231,7 @@ private struct ThickProgressBar: View {
     GeometryReader { geo in
       ZStack(alignment: .leading) {
         Capsule()
-          .fill(Color(.systemFill))
+          .fill(FMSTheme.pillBackground)
           .frame(height: 8)
         Capsule()
           .fill(tint)
@@ -252,7 +252,7 @@ private struct CallButton: View {
     } label: {
       Label("Call", systemImage: "phone.fill")
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color(.systemBackground))
+        .foregroundStyle(FMSTheme.obsidian)
         .padding(.horizontal, 18)
         .padding(.vertical, 9)
         .background(FMSTheme.amber, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -271,7 +271,7 @@ private struct TrackButton: View {
     } label: {
       Label("Track", systemImage: "location.fill")
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color(.systemBackground))
+        .foregroundStyle(FMSTheme.obsidian)
         .padding(.horizontal, 18)
         .padding(.vertical, 9)
         .background(FMSTheme.amber, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -302,7 +302,7 @@ struct StatusBadge: View {
     switch status {
     case .available: return FMSTheme.alertGreen
     case .onTrip: return FMSTheme.amber
-    case .offDuty: return Color(.tertiaryLabel)
+    case .offDuty: return FMSTheme.textTertiary
     }
   }
 }
@@ -327,8 +327,8 @@ private struct ShiftStatusChip: View {
     switch status {
     case "on_duty": return FMSTheme.alertGreen
     case "break": return FMSTheme.amber
-    case "not_started": return Color(.tertiaryLabel)
-    default: return Color(.secondaryLabel)
+    case "not_started": return FMSTheme.textTertiary
+    default: return FMSTheme.textSecondary
     }
   }
 }

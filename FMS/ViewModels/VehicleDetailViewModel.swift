@@ -5,15 +5,12 @@ import Supabase
 @Observable
 public class VehicleDetailViewModel {
     public var trips: [Trip] = []
-    public var assignments: [DriverVehicleAssignment] = []
     public var workOrders: [MaintenanceWorkOrder] = []
     public var incidents: [Incident] = []
     public var isLoadingTrips = false
-    public var isLoadingAssignments = false
     public var isLoadingWorkOrders = false
     public var isLoadingEvents = false
     public var tripsErrorMessage: String? = nil
-    public var assignmentsErrorMessage: String? = nil
     public var workOrdersErrorMessage: String? = nil
     public var incidentsErrorMessage: String? = nil
     public init() {}
@@ -21,19 +18,14 @@ public class VehicleDetailViewModel {
     @MainActor
     public func fetch(vehicleId: String) async {
         trips = []
-        assignments = []
         workOrders = []
         incidents = []
         tripsErrorMessage = nil
-        assignmentsErrorMessage = nil
         workOrdersErrorMessage = nil
         incidentsErrorMessage = nil
         await withTaskGroup(of: Void.self) { group in
             group.addTask { [weak self] in
                 await self?.fetchTrips(vehicleId: vehicleId)
-            }
-            group.addTask { [weak self] in
-                await self?.fetchAssignments(vehicleId: vehicleId)
             }
             group.addTask { [weak self] in
                 await self?.fetchWorkOrders(vehicleId: vehicleId)
@@ -65,26 +57,6 @@ public class VehicleDetailViewModel {
         }
     }
 
-    @MainActor
-    private func fetchAssignments(vehicleId: String) async {
-        isLoadingAssignments = true
-        defer { isLoadingAssignments = false }
-
-        do {
-            let fetched: [DriverVehicleAssignment] = try await SupabaseService.shared.client
-                .from("driver_vehicle_assignments")
-                .select()
-                .eq("vehicle_id", value: vehicleId)
-                .order("shift_start", ascending: false)
-                .execute()
-                .value
-            assignments = fetched
-            assignmentsErrorMessage = nil
-        } catch {
-            assignmentsErrorMessage = error.localizedDescription
-            print("Error fetching assignments: \(error)")
-        }
-    }
     
     @MainActor
     private func fetchWorkOrders(vehicleId: String) async {

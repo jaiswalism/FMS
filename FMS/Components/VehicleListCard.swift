@@ -17,12 +17,7 @@ struct VehicleListCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Header Row (Plate Pill)
                 HStack(alignment: .top) {
-                    // Plate Number Pill
                     HStack(spacing: 6) {
-                        Circle()
-                            .fill(FMSTheme.statusColor(for: vehicle.status ?? ""))
-                            .frame(width: 8, height: 8)
-                        
                         Text(vehicle.plateNumber)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(FMSTheme.textPrimary)
@@ -33,6 +28,19 @@ struct VehicleListCard: View {
                     .cornerRadius(8)
                     
                     Spacer()
+                    
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(statusDotColor)
+                            .frame(width: 8, height: 8)
+                        Text(statusLabel)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(statusTextColor)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(statusPillBackground)
+                    .cornerRadius(10)
                 }
                 
                 // Details Rows
@@ -82,7 +90,7 @@ struct VehicleListCard: View {
                         .background(FMSTheme.amber)
                         .cornerRadius(10)
                     }
-                    .disabled(true)
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 4)
             }
@@ -101,6 +109,46 @@ struct VehicleListCard: View {
         let model = vehicle.model ?? ""
         let fullName = "\(manufacturer) \(model)".trimmingCharacters(in: .whitespaces)
         return fullName.isEmpty ? "Unknown Vehicle" : fullName
+    }
+
+    private var statusLabel: String {
+        let normalized = VehicleStatus.normalize(vehicle.status ?? "")
+        switch normalized {
+        case "active": return "On Trip"
+        case "maintenance": return "Maintenance"
+        case "inactive": return "In Yard"
+        default: return (vehicle.status ?? "Unknown").capitalized
+        }
+    }
+    
+    private var statusPillBackground: Color {
+        let normalized = VehicleStatus.normalize(vehicle.status ?? "")
+        switch normalized {
+        case "active": return FMSTheme.alertGreen.opacity(0.15)
+        case "maintenance": return FMSTheme.alertAmber.opacity(0.2)
+        case "inactive": return FMSTheme.textTertiary.opacity(0.15)
+        default: return FMSTheme.backgroundPrimary
+        }
+    }
+    
+    private var statusTextColor: Color {
+        let normalized = VehicleStatus.normalize(vehicle.status ?? "")
+        switch normalized {
+        case "active": return FMSTheme.alertGreen
+        case "maintenance": return FMSTheme.alertAmber
+        case "inactive": return FMSTheme.textSecondary
+        default: return FMSTheme.textSecondary
+        }
+    }
+    
+    private var statusDotColor: Color {
+        let normalized = VehicleStatus.normalize(vehicle.status ?? "")
+        switch normalized {
+        case "active": return FMSTheme.alertGreen
+        case "maintenance": return FMSTheme.alertAmber
+        case "inactive": return FMSTheme.textSecondary
+        default: return FMSTheme.statusColor(for: vehicle.status ?? "")
+        }
     }
     
     

@@ -38,7 +38,7 @@ public struct DriversView: View {
         }
       }
       .scrollDismissesKeyboard(.interactively)
-      .background(Color(.systemGroupedBackground).ignoresSafeArea())
+      .background(FMSTheme.backgroundPrimary.ignoresSafeArea())
       .navigationTitle("")
       .navigationBarTitleDisplayMode(.inline)
       .searchable(text: $vm.searchText, prompt: "Search driver name or ID")
@@ -82,11 +82,11 @@ private struct DriversSummaryHeader: View {
       HStack(alignment: .firstTextBaseline) {
         Text("Drivers")
           .font(.largeTitle.bold())
-          .foregroundStyle(Color(.label))
+          .foregroundStyle(FMSTheme.textPrimary)
         Spacer()
         Text("\(vm.totalCount) Total")
           .font(.subheadline.weight(.semibold))
-          .foregroundStyle(Color(.secondaryLabel))
+          .foregroundStyle(FMSTheme.textSecondary)
       }
 
       // Amber summary card
@@ -102,7 +102,7 @@ private struct DriversSummaryHeader: View {
           LinearGradient(
             colors: [
               FMSTheme.amber,
-              FMSTheme.amber.opacity(0.82),
+              FMSTheme.amberDark,
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -112,23 +112,23 @@ private struct DriversSummaryHeader: View {
       // Ghost icon
       Image(systemName: "person.2.fill")
         .font(.system(size: 90))
-        .foregroundStyle(Color(.systemBackground).opacity(0.09))
+        .foregroundStyle(FMSTheme.obsidian.opacity(0.12))
         .offset(x: 12, y: 18)
 
       // Content
       HStack(alignment: .top, spacing: 0) {
         VStack(alignment: .leading, spacing: 6) {
           Text("WORKFORCE")
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Color(.systemBackground).opacity(0.7))
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(FMSTheme.obsidian.opacity(0.6))
 
           Text("\(vm.onDutyCount) Active")
-            .font(.system(size: 34, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color(.systemBackground))
+            .font(.system(size: 36, weight: .bold))
+            .foregroundStyle(FMSTheme.obsidian)
 
           Text("Drivers on duty right now")
-            .font(.subheadline)
-            .foregroundStyle(Color(.systemBackground).opacity(0.75))
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(FMSTheme.obsidian.opacity(0.7))
 
           // Stat pills
           HStack(spacing: 8) {
@@ -162,14 +162,14 @@ private struct StatPill: View {
   var body: some View {
     HStack(spacing: 4) {
       Image(systemName: icon)
-        .font(.caption2)
+        .font(.system(size: 12, weight: .semibold))
       Text("\(count) \(label)")
-        .font(.caption.weight(.semibold))
+        .font(.system(size: 12, weight: .semibold))
     }
-    .foregroundStyle(Color(.systemBackground).opacity(0.85))
+    .foregroundStyle(FMSTheme.obsidian)
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
-    .background(Color(.systemBackground).opacity(0.18))
+    .background(Color.white.opacity(0.7))
     .clipShape(Capsule())
   }
 }
@@ -282,24 +282,24 @@ private struct FilterChip: View {
           .padding(.vertical, 2)
           .background(
             isSelected
-              ? Color.white.opacity(0.35)
-              : Color(.tertiarySystemFill)
+              ? FMSTheme.backgroundPrimary.opacity(0.35)
+              : FMSTheme.pillBackground
           )
           .clipShape(Capsule())
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 8)
-      .foregroundStyle(isSelected ? .white : Color(.label))
+      .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textPrimary)
       .background {
         if isSelected {
           Capsule().fill(FMSTheme.amber)
         } else {
-          Capsule().fill(Color(.secondarySystemGroupedBackground))
+          Capsule().fill(FMSTheme.cardBackground)
         }
       }
       .overlay {
         if !isSelected {
-          Capsule().strokeBorder(Color(.separator), lineWidth: 0.5)
+          Capsule().strokeBorder(FMSTheme.borderLight, lineWidth: 0.5)
         }
       }
     }
@@ -329,10 +329,10 @@ private struct DayCell: View {
       VStack(spacing: 3) {
         Text(abbrev)
           .font(.caption2.weight(.semibold))
-          .foregroundStyle(isSelected ? .white : Color(.secondaryLabel))
+          .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textSecondary)
         Text(number)
           .font(.system(size: 16, weight: isSelected ? .bold : .regular, design: .rounded))
-          .foregroundStyle(isSelected ? .white : Color(.label))
+          .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textPrimary)
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 8)
@@ -364,10 +364,10 @@ private struct EmptyStateView: View {
     VStack(spacing: 16) {
       Image(systemName: icon)
         .font(.system(size: 44))
-        .foregroundStyle(Color(.tertiaryLabel))
+        .foregroundStyle(FMSTheme.textTertiary)
       Text(message)
         .font(.body)
-        .foregroundStyle(Color(.secondaryLabel))
+        .foregroundStyle(FMSTheme.textSecondary)
     }
     .frame(maxWidth: .infinity)
   }
