@@ -87,44 +87,27 @@ public struct VehicleDetailView: View {
     
     private var shiftStatusCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shift Status")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(FMSTheme.textPrimary)
+            HStack(spacing: 8) {
+                Text("Shift Status")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(FMSTheme.textPrimary)
+                
+                if let assignment = activeOrLatestAssignment {
+                    Spacer()
+                    Text(assignmentStatusText(assignment).capitalized)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(FMSTheme.textSecondary)
+                }
+            }
             
-            if let error = viewModel.tripsErrorMessage {
-                errorCard(text: "Unable to load trip status.\n\(error)")
-            } else if let trip = activeOrLatestTrip {
-                HStack {
-                    Text(tripRoute(trip))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(FMSTheme.textSecondary)
-                        .lineLimit(1)
-                    Spacer()
-                    Text(tripStatusText(trip))
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(FMSTheme.textSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(FMSTheme.backgroundPrimary)
-                        .cornerRadius(6)
-                }
-                
-                ProgressView(value: shiftProgress(trip))
-                    .progressViewStyle(LinearProgressViewStyle(tint: FMSTheme.amber))
-                    .background(FMSTheme.borderLight)
-                    .clipShape(Capsule())
-                
-                HStack {
-                    Text(tripTimeWindowText(trip))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(FMSTheme.textTertiary)
-                    Spacer()
-                    Text(tripDurationText(trip))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(FMSTheme.textTertiary)
-                }
+            if viewModel.isLoadingAssignments {
+                loadingCard(text: "Loading shift status...")
+            } else if let error = viewModel.assignmentsErrorMessage {
+                errorCard(text: "Unable to load shift status.\n\(error)")
+            } else if let assignment = activeOrLatestAssignment {
+                shiftTimeRow(assignment)
             } else {
-                Text("No recent trips found.")
+                Text("No shift assignments found.")
                     .font(.system(size: 14))
                     .foregroundColor(FMSTheme.textTertiary)
             }
@@ -214,21 +197,13 @@ public struct VehicleDetailView: View {
     private func tripCard(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(tripRoute(trip))
+                Text(tripTitleText(trip))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(FMSTheme.textPrimary)
                     .lineLimit(1)
-                
-                Spacer()
-                
-                Text(tripStatusText(trip))
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(FMSTheme.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(FMSTheme.backgroundPrimary)
-                    .cornerRadius(6)
             }
+
+            tripRouteRow(trip)
             
             HStack(spacing: 14) {
                 infoPill(icon: "calendar", text: tripDateText(trip))
@@ -280,7 +255,7 @@ public struct VehicleDetailView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(FMSTheme.textPrimary)
                 Spacer()
-                Text((incident.severity ?? "Unknown").uppercased())
+                Text(humanize(incident.severity ?? "Unknown").uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(FMSTheme.textSecondary)
                     .padding(.horizontal, 8)
@@ -447,10 +422,50 @@ public struct VehicleDetailView: View {
         return "\(Int(odometer)) km"
     }
     
+    private func tripTitleText(_ trip: Trip) -> String {
+        let shipment = trip.shipmentDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !shipment.isEmpty { return shipment }
+        return tripRoute(trip)
+    }
+    
     private func tripRoute(_ trip: Trip) -> String {
-        let start = trip.startName ?? "Start"
-        let end = trip.endName ?? "End"
-        return "\(start) -> \(end)"
+        let start = trip.startName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let end = trip.endName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !start.isEmpty || !end.isEmpty {
+            let startText = start.isEmpty ? "Start" : start
+            let endText = end.isEmpty ? "End" : end
+            return "\(startText) to \(endText)"
+        }
+        return "Trip"
+    }
+
+    private func tripRouteRow(_ trip: Trip) -> some View {
+        let start = trip.startName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let end = trip.endName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let startText = start.isEmpty ? "Start" : start
+        let endText = end.isEmpty ? "End" : end
+
+        return HStack(spacing: 8) {
+            Text(startText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(FMSTheme.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "arrow.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(FMSTheme.textTertiary)
+
+            Spacer(minLength: 8)
+
+            Text(endText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(FMSTheme.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
     }
     
     private func tripDateText(_ trip: Trip) -> String {
@@ -488,6 +503,60 @@ public struct VehicleDetailView: View {
     private func tripStatusText(_ trip: Trip) -> String {
         (trip.status ?? "Unknown").uppercased()
     }
+
+    private func assignmentStatusText(_ assignment: DriverVehicleAssignment) -> String {
+        if let status = assignment.status?.trimmingCharacters(in: .whitespacesAndNewlines), !status.isEmpty {
+            return status.uppercased()
+        }
+        if let start = assignment.shiftStart, let end = assignment.shiftEnd {
+            let now = Date()
+            return now >= start && now <= end ? "ACTIVE" : "SCHEDULED"
+        }
+        return "UNKNOWN"
+    }
+
+    private func shiftTimeRow(_ assignment: DriverVehicleAssignment) -> some View {
+        let startText = formatTime(assignment.shiftStart) ?? "Start"
+        let endText = formatTime(assignment.shiftEnd) ?? "End"
+        let durationText = shiftDurationText(assignment)
+        
+        return HStack(spacing: 8) {
+            Text(startText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(FMSTheme.textSecondary)
+                .lineLimit(1)
+            
+            Spacer(minLength: 8)
+            
+            HStack(spacing: 6) {
+                Text(durationText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(FMSTheme.textTertiary)
+                Image(systemName: "arrow.right.long")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(FMSTheme.textTertiary)
+            }
+            
+            Spacer(minLength: 8)
+            
+            Text(endText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(FMSTheme.textSecondary)
+                .lineLimit(1)
+        }
+    }
+    
+    private func shiftDurationText(_ assignment: DriverVehicleAssignment) -> String {
+        if let start = assignment.shiftStart, let end = assignment.shiftEnd {
+            let duration = end.timeIntervalSince(start) / 60.0
+            return "\(max(0, Int(duration))) min"
+        }
+        if let start = assignment.shiftStart {
+            let elapsed = Date().timeIntervalSince(start) / 60.0
+            return "\(max(0, Int(elapsed))) min"
+        }
+        return "-- min"
+    }
     
     private func workOrderDateText(_ order: MaintenanceWorkOrder) -> String {
         let date = order.completedAt ?? order.createdAt
@@ -501,7 +570,7 @@ public struct VehicleDetailView: View {
     
     private func incidentTitle(_ incident: Incident) -> String {
         let severity = incident.severity?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return severity?.isEmpty == false ? severity! : "Incident"
+        return humanize(severity?.isEmpty == false ? severity! : "Incident")
     }
     
     private func incidentTimeText(_ incident: Incident) -> String {
@@ -545,16 +614,42 @@ public struct VehicleDetailView: View {
         return viewModel.trips
     }
     
-    private var activeOrLatestTrip: Trip? {
-        currentTrip ?? viewModel.trips.first
+    private var activeOrLatestAssignment: DriverVehicleAssignment? {
+        if let active = viewModel.assignments.first(where: { assignment in
+            let status = assignment.status?.lowercased() ?? ""
+            if status == "active" || status == "ongoing" || status == "in_progress" {
+                return true
+            }
+            if let start = assignment.shiftStart, let end = assignment.shiftEnd {
+                let now = Date()
+                return now >= start && now <= end
+            }
+            if let start = assignment.shiftStart, assignment.shiftEnd == nil {
+                return Date() >= start
+            }
+            return false
+        }) {
+            return active
+        }
+        return viewModel.assignments.first
     }
     
-    private func shiftProgress(_ trip: Trip) -> Double {
-        guard let start = trip.startTime else { return 0 }
-        guard let estimated = trip.estimatedDurationMin, estimated > 0 else { return 0 }
-        let elapsed = Date().timeIntervalSince(start) / 60.0
-        let progress = elapsed / Double(estimated)
+    private func shiftProgress(_ assignment: DriverVehicleAssignment) -> Double {
+        guard let start = assignment.shiftStart, let end = assignment.shiftEnd else { return 0 }
+        let total = end.timeIntervalSince(start)
+        guard total > 0 else { return 0 }
+        let elapsed = Date().timeIntervalSince(start)
+        let progress = elapsed / total
         return max(0, min(progress, 1))
+    }
+
+    private func humanize(_ value: String) -> String {
+        let cleaned = value
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+        let parts = cleaned.split(separator: " ")
+        if parts.isEmpty { return value }
+        return parts.map { $0.capitalized }.joined(separator: " ")
     }
 }
 
