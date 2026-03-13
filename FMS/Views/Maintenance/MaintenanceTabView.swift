@@ -4,15 +4,16 @@ public struct MaintenanceTabView: View {
     @Environment(AuthViewModel.self) private var authViewModel
     @State private var selectedTab = 0
 
-    // Single source of truth — shared across Dashboard + Defects
+    // Single source of truth — shared across Dashboard + Defects + Inventory
     @State private var woStore      = WorkOrderStore()
     @State private var defectStore  = DefectStore()
+    @State private var invStore     = InventoryStore()
 
     public init() {}
 
     public var body: some View {
         TabView(selection: $selectedTab) {
-            MaintenanceDashboardView(woStore: woStore)
+            MaintenanceDashboardView(woStore: woStore, invStore: invStore)
                 .tabItem {
                     Label("Dashboard", systemImage: "squares.below.rectangle")
                 }
@@ -24,7 +25,7 @@ public struct MaintenanceTabView: View {
                 }
                 .tag(1)
 
-            InventoryView()
+            InventoryView(store: invStore)
                 .tabItem {
                     Label("Inventory", systemImage: "shippingbox")
                 }
@@ -44,6 +45,7 @@ public struct MaintenanceTabView: View {
 public struct ProfileTabView: View {
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @State private var notificationsEnabled = true
 
     public var body: some View {
         NavigationStack {
@@ -143,7 +145,11 @@ public struct ProfileTabView: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(FMSTheme.textPrimary)
                     Spacer()
+<<<<<<< HEAD
                     Toggle("", isOn: .constant(true))
+=======
+                    Toggle("", isOn: $notificationsEnabled)
+>>>>>>> 8147c81 (Maintainace Module updated)
                         .tint(FMSTheme.amber)
                 }
             }

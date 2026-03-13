@@ -152,6 +152,8 @@ struct ReorderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var quantities: [UUID: String] = [:]
+    @State private var reorderError: String? = nil
+    @State private var showReorderError = false
 
     private var lowParts: [PartItem] { store.lowStockParts }
 
@@ -173,6 +175,7 @@ struct ReorderView: View {
 
                         Button {
                             Task {
+<<<<<<< HEAD
                                 do {
                                     var didReorder = false
                                     for part in lowParts {
@@ -186,6 +189,33 @@ struct ReorderView: View {
                                     }
                                 } catch {
                                     print("Error bulk reordering: \(error)")
+=======
+                                var hasErrors = false
+                                var didReorder = false
+                                
+                                for part in lowParts {
+                                    if let q = Int(quantities[part.id] ?? ""), q > 0 {
+                                        do {
+                                            try await store.reorder(part: part, quantity: q)
+                                            didReorder = true
+                                            await MainActor.run { quantities[part.id] = "" }
+                                        } catch {
+                                            print("Error bulk reordering part \(part.name): \(error)")
+                                            hasErrors = true
+                                        }
+                                    }
+                                }
+                                
+                                await MainActor.run {
+                                    if didReorder && !hasErrors {
+                                        dismiss()
+                                    } else if hasErrors {
+                                        reorderError = "Some items failed to order. Please try again."
+                                        showReorderError = true
+                                    } else if !didReorder {
+                                        dismiss() // nothing ordered
+                                    }
+>>>>>>> 8147c81 (Maintainace Module updated)
                                 }
                             }
                         } label: {
@@ -210,6 +240,11 @@ struct ReorderView: View {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(FMSTheme.textSecondary)
                 }
+            }
+            .alert("Order Error", isPresented: $showReorderError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(reorderError ?? "An unknown error occurred.")
             }
         }
     }

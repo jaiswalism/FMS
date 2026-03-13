@@ -95,9 +95,18 @@ struct WODetailView: View {
                                 HStack(spacing: 8) {
                                     ForEach(WOItem.Status.allCases, id: \.self) { s in
                                         Button {
-                                            withAnimation(.spring(response: 0.3)) {
-                                                wo.status = s
-                                                store.update(wo)
+                                            let newState = s
+                                            Task {
+                                                do {
+                                                    var updatedWO = wo
+                                                    updatedWO.status = newState
+                                                    try await store.update(updatedWO)
+                                                    await MainActor.run {
+                                                        withAnimation(.spring(response: 0.3)) { wo.status = newState }
+                                                    }
+                                                } catch {
+                                                    print("Error updating status: \(error)")
+                                                }
                                             }
                                         } label: {
                                             Text(s.rawValue).font(.system(size: 12, weight: .semibold))
@@ -158,8 +167,23 @@ struct WODetailView: View {
                                         }
                                         Spacer()
                                         Button {
-                                            wo.partsUsed.removeAll { $0.id == part.id }
-                                            store.removePartUsed(part.id, from: wo.id)
+                                            let pId = part.id
+                                            let wId = wo.id
+                                            let qtyToRestore = part.quantity ?? 1
+                                            let matchedPartId = part.partId ?? ""
+                                            Task {
+                                                do {
+                                                    if let p = invStore.parts.first(where: { $0.id.uuidString.lowercased() == matchedPartId.lowercased() }) {
+                                                        try await invStore.reorder(part: p, quantity: qtyToRestore)
+                                                    }
+                                                    try await store.removePartUsed(pId, from: wId)
+                                                    await MainActor.run {
+                                                        wo.partsUsed.removeAll { $0.id == pId }
+                                                    }
+                                                } catch {
+                                                    print("Error restoring stock or removing part used: \(error)")
+                                                }
+                                            }
                                         } label: {
                                             Image(systemName: "trash").font(.system(size: 12))
                                                 .foregroundColor(FMSTheme.alertRed)
@@ -258,7 +282,10 @@ struct WODetailView: View {
                                             }
                                         }
 
-                                        let invalidSubmission = selectedPartId == nil || invStore.parts.first(where:{ $0.id == selectedPartId })?.stock == 0
+                                        let invalidSubmission = selectedPartId == nil || 
+                                            invStore.parts.first(where:{ $0.id == selectedPartId })?.stock == 0 || 
+                                            (Int(puQty) ?? 0) <= 0
+                                            
                                         Button {
                                             guard let id = selectedPartId,
                                                   let selectedItem = invStore.parts.first(where: { $0.id == id }) else { return }
@@ -276,7 +303,11 @@ struct WODetailView: View {
                                             Task {
                                                 do {
                                                     try await invStore.reorder(part: selectedItem, quantity: -qty)
+<<<<<<< HEAD
                                                     store.addPartUsed(part, to: wo.id)
+=======
+                                                    try await store.addPartUsed(part, to: wo.id)
+>>>>>>> 8147c81 (Maintainace Module updated)
                                                     await MainActor.run {
                                                         withAnimation { wo.partsUsed.append(part) }
                                                         // Reset
@@ -379,7 +410,7 @@ struct WODetailView: View {
         .task {
             await invStore.fetchParts()
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .alert("Delete Work Order", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
@@ -396,8 +427,20 @@ struct WODetailView: View {
         .alert("Complete Job", isPresented: $showingCompleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Confirm") {
-                withAnimation { store.updateStatus(wo.id, status: .completed) }
-                wo.status = .completed; wo.completedAt = Date()
+                let id = wo.id
+                Task {
+                    do {
+                        try await store.updateStatus(id, status: .completed)
+                        await MainActor.run {
+                            withAnimation {
+                                wo.status = .completed
+                                wo.completedAt = Date()
+                            }
+                        }
+                    } catch {
+                        print("Error completing work order: \(error)")
+                    }
+                }
             }
         } message: { Text("Mark \(wo.woNumber) as Completed?") }
     }

@@ -151,6 +151,7 @@ struct FMSNavToolbar: ToolbarContent {
                         .font(.system(size: 16, weight: .medium))
                 }
                 .tint(.primary)
+                .disabled(true)
 
                 Button { showingCreate = true } label: {
                     Image(systemName: "plus")
@@ -177,6 +178,7 @@ struct FMSToolbar: ToolbarContent {
                         .font(.system(size: 16, weight: .medium))
                 }
                 .tint(.primary)
+                .disabled(true)
 
                 Button { showingCreate = true } label: {
                     Image(systemName: "plus")

@@ -1,15 +1,23 @@
 import SwiftUI
 
 struct DefectDetailView: View {
-    @State var defect: DefectItem
+    @State private var defect: DefectItem
     let store: DefectStore
     let woStore: WorkOrderStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    
+    init(defect: DefectItem, store: DefectStore, woStore: WorkOrderStore) {
+        self._defect = State(initialValue: defect)
+        self.store = store
+        self.woStore = woStore
+    }
 
     @State private var showingEdit        = false
     @State private var showingDeleteAlert = false
     @State private var showingCreateWO    = false
+    @State private var deleteErrorMessage: String? = nil
+    @State private var showingDeleteError = false
 
     private var cardBg: Color {
         colorScheme == .dark ? Color(red: 28/255, green: 28/255, blue: 30/255) : FMSTheme.cardBackground
@@ -36,7 +44,7 @@ struct DefectDetailView: View {
                             .font(.headline.weight(.bold))
                             .foregroundColor(colorScheme == .dark ? .white : FMSTheme.textPrimary)
                             .lineLimit(1)
-                        Text(defect.vehicle)
+                        Text(defect.vehicleDisplay)
                             .font(.caption)
                             .foregroundColor(FMSTheme.textSecondary)
                     }
@@ -187,6 +195,7 @@ struct DefectDetailView: View {
             EditDefectView(defect: $defect, store: store)
         }
         .sheet(isPresented: $showingCreateWO) {
+<<<<<<< HEAD
             CreateWorkOrderView(prefillVehicle: defect.vehicle) { newWO in
                 Task {
                     do {
@@ -202,18 +211,49 @@ struct DefectDetailView: View {
                         }
                     } catch {
                         print("Error creating WO and linking to defect details: \(error)")
+=======
+            CreateWorkOrderView(prefillVehicle: defect.vehicleId) { newWO in
+                let insertedWO = try await woStore.addItem(WOItem(from: newWO))
+                do {
+                    try await store.linkWorkOrder(defectId: defect.id, workOrderId: insertedWO.id)
+                    await MainActor.run {
+                        defect.linkedWorkOrderId = insertedWO.id
+                        defect.status = "in_progress"
+>>>>>>> 8147c81 (Maintainace Module updated)
                     }
+                } catch {
+                    print("Error linking WO \(insertedWO.id) to defect \(defect.id). Rolling back...")
+                    do {
+                        try await woStore.delete(id: insertedWO.id)
+                    } catch let deleteError {
+                        print("CRITICAL: Failed to rollback orphaned WO \(insertedWO.id). Error: \(deleteError)")
+                    }
+                    throw error
                 }
             }
         }
         .alert("Delete Defect", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                store.deleteDefect(id: defect.id)
-                dismiss()
+                Task {
+                    do {
+                        try await store.deleteDefect(id: defect.id)
+                        await MainActor.run { dismiss() }
+                    } catch {
+                        await MainActor.run {
+                            deleteErrorMessage = error.localizedDescription
+                            showingDeleteError = true
+                        }
+                    }
+                }
             }
         } message: {
             Text("Remove \"\(defect.title)\"? This cannot be undone.")
+        }
+        .alert("Error Deleting", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteErrorMessage ?? "An unknown error occurred.")
         }
     }
 }

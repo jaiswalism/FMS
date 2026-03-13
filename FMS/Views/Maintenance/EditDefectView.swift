@@ -7,12 +7,15 @@ struct EditDefectView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var title       = ""
-    @State private var vehicle     = ""
+    @State private var vehicleDisplay = ""
     @State private var description = ""
     @State private var priority    = DefectItem.Priority.medium
 
     let categories = ["mechanical", "electrical", "tyres", "brakes", "body", "other"]
     @State private var category = "mechanical"
+    
+    @State private var updateError: String? = nil
+    @State private var showUpdateError = false
 
     var body: some View {
         NavigationStack {
@@ -25,7 +28,9 @@ struct EditDefectView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 EDField(label: "TITLE", placeholder: "e.g. Tyre Puncture", text: $title, icon: "exclamationmark.triangle.fill")
                                 Divider().opacity(0.4)
-                                EDField(label: "VEHICLE", placeholder: "e.g. Truck #402", text: $vehicle, icon: "box.truck")
+                                EDField(label: "VEHICLE", placeholder: "e.g. Truck #402", text: $vehicleDisplay, icon: "box.truck")
+                                    .disabled(true)
+                                    .opacity(0.7)
                             }
                         }
 
@@ -81,15 +86,32 @@ struct EditDefectView: View {
                         }
 
                         Button {
+<<<<<<< HEAD
                             guard !title.isEmpty, !vehicle.isEmpty else { return }
                             defect.title       = title
                             defect.vehicle     = vehicle
+=======
+                            guard !title.isEmpty else { return }
+                            defect.title       = title
+>>>>>>> 8147c81 (Maintainace Module updated)
                             defect.category    = category
                             defect.priority    = priority
                             defect.description = description
                             Task {
+<<<<<<< HEAD
                                 try? await store.updateDefect(defect)
                                 await MainActor.run { dismiss() }
+=======
+                                do {
+                                    try await store.updateDefect(defect)
+                                    await MainActor.run { dismiss() }
+                                } catch {
+                                    await MainActor.run {
+                                        updateError = error.localizedDescription
+                                        showUpdateError = true
+                                    }
+                                }
+>>>>>>> 8147c81 (Maintainace Module updated)
                             }
                         } label: {
                             Text("Save Changes").font(.system(size: 16, weight: .bold))
@@ -107,8 +129,13 @@ struct EditDefectView: View {
                 }
             }
             .onAppear {
-                title = defect.title; vehicle = defect.vehicle
+                title = defect.title; vehicleDisplay = defect.vehicleDisplay
                 description = defect.description; priority = defect.priority; category = defect.category
+            }
+            .alert("Error Updating", isPresented: $showUpdateError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(updateError ?? "An unknown error occurred.")
             }
         }
     }

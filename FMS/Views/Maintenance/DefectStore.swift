@@ -2,11 +2,13 @@ import SwiftUI
 import PostgREST
 import Supabase
 
+// Force cache invalidation rebuilding DefectItem
 // MARK: - DefectItem (UI display model — wraps Defect)
 struct DefectItem: Identifiable {
     var id: UUID
     var title: String
-    var vehicle: String          // maps to vehicleId
+    var vehicleId: String        // maps to DB vehicleId
+    var vehicleDisplay: String   // maps to UI presentation
     var category: String
     var priority: Priority
     var description: String
@@ -63,10 +65,11 @@ struct DefectItem: Identifiable {
 
     // MARK: Convert from DB model
     init(from defect: Defect) {
-        self.id          = UUID(uuidString: defect.id) ?? UUID()
-        self.title       = defect.title
-        self.vehicle     = defect.vehicleId
-        self.category    = defect.category ?? "Other"
+        self.id             = UUID(uuidString: defect.id) ?? UUID()
+        self.title          = defect.title
+        self.vehicleId      = defect.vehicleId
+        self.vehicleDisplay = defect.vehicleId // Temporary fallback
+        self.category       = defect.category ?? "Other"
         self.priority    = Priority.from(defect.priority ?? "medium")
         self.description = defect.description ?? ""
         self.reportedAt  = defect.reportedAt ?? Date()
@@ -78,7 +81,7 @@ struct DefectItem: Identifiable {
     func toDefect() -> Defect {
         Defect(
             id:          id.uuidString,
-            vehicleId:   vehicle,
+            vehicleId:   vehicleId,
             reportedBy:  nil,
             workOrderId: linkedWorkOrderId,
             title:       title,
@@ -92,12 +95,13 @@ struct DefectItem: Identifiable {
     }
 
     // Manual memberwise init (for local creation before saving)
-    init(id: UUID = UUID(), title: String, vehicle: String, category: String,
+    init(id: UUID = UUID(), title: String, vehicleId: String, vehicleDisplay: String = "", category: String,
          priority: Priority, description: String, reportedAt: Date,
          status: String = "open", linkedWorkOrderId: String? = nil) {
         self.id                = id
         self.title             = title
-        self.vehicle           = vehicle
+        self.vehicleId         = vehicleId
+        self.vehicleDisplay    = vehicleDisplay.isEmpty ? vehicleId : vehicleDisplay
         self.category          = category
         self.priority          = priority
         self.description       = description
@@ -139,13 +143,21 @@ class DefectStore {
             
             for i in mappedItems.indices {
                 // Map the vehicle UUID to a readable name matching WorkOrderStore
+<<<<<<< HEAD
                 let originalId = mappedItems[i].vehicle
+=======
+                let originalId = mappedItems[i].vehicleId
+>>>>>>> 8147c81 (Maintainace Module updated)
                 if let matchedVehicle = fetchedVehicles.first(where: { $0.id == originalId }) {
                     let make = matchedVehicle.manufacturer ?? "Unknown"
                     let model = matchedVehicle.model ?? "Vehicle"
                     let plate = matchedVehicle.plateNumber
                     
+<<<<<<< HEAD
                     mappedItems[i].vehicle = "\(make) \(model) · \(plate)".trimmingCharacters(in: .whitespaces)
+=======
+                    mappedItems[i].vehicleDisplay = "\(make) \(model) · \(plate)".trimmingCharacters(in: .whitespaces)
+>>>>>>> 8147c81 (Maintainace Module updated)
                 }
             }
 
@@ -189,38 +201,31 @@ class DefectStore {
         }
     }
 
-    func deleteDefect(id: UUID) {
-        Task {
-            do {
-                try await SupabaseService.shared.client
-                    .from("defects")
-                    .delete()
-                    .eq("id", value: id.uuidString)
-                    .execute()
+    func deleteDefect(id: UUID) async throws {
+        try await SupabaseService.shared.client
+            .from("defects")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
 
-                await MainActor.run {
-                    self.defects.removeAll { $0.id == id }
-                }
-            } catch {
-                print("Error deleting defect: \(error)")
-            }
+        await MainActor.run {
+            self.defects.removeAll { $0.id == id }
         }
     }
 
     /// Links a work order to a defect: updates work_order_id + status in DB and locally.
-    func linkWorkOrder(defectId: UUID, workOrderId: String) {
-        Task {
-            do {
-                struct WOLink: Encodable {
-                    var work_order_id: String
-                    var status: String
-                }
-                try await SupabaseService.shared.client
-                    .from("defects")
-                    .update(WOLink(work_order_id: workOrderId, status: "in_progress"))
-                    .eq("id", value: defectId.uuidString)
-                    .execute()
+    func linkWorkOrder(defectId: UUID, workOrderId: String) async throws {
+        struct WOLink: Encodable {
+            var work_order_id: String
+            var status: String
+        }
+        try await SupabaseService.shared.client
+            .from("defects")
+            .update(WOLink(work_order_id: workOrderId, status: "in_progress"))
+            .eq("id", value: defectId.uuidString)
+            .execute()
 
+<<<<<<< HEAD
                 await MainActor.run {
                     if let idx = self.defects.firstIndex(where: { $0.id == defectId }) {
                         self.defects[idx].linkedWorkOrderId = workOrderId
@@ -229,6 +234,12 @@ class DefectStore {
                 }
             } catch {
                 print("Error linking WO to defect: \(error)")
+=======
+        await MainActor.run {
+            if let idx = self.defects.firstIndex(where: { $0.id == defectId }) {
+                self.defects[idx].linkedWorkOrderId = workOrderId
+                self.defects[idx].status            = "in_progress"
+>>>>>>> 8147c81 (Maintainace Module updated)
             }
         }
     }
@@ -238,5 +249,9 @@ class DefectStore {
         try await addDefect(defect)
     };
     func update(_ defect: DefectItem) async throws { try await updateDefect(defect) }
+<<<<<<< HEAD
     func delete(id: UUID) { deleteDefect(id: id) }
+=======
+    func delete(id: UUID) async throws { try await deleteDefect(id: id) }
+>>>>>>> 8147c81 (Maintainace Module updated)
 }

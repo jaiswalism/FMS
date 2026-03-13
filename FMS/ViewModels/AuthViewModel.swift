@@ -100,8 +100,7 @@ public class AuthViewModel {
         }
     }
     
-    public func logout() async {
-        try? await SupabaseService.shared.client.auth.signOut()
+    public func logout() {
         selectedRole = nil
         isAuthenticated = false
         currentUser = nil

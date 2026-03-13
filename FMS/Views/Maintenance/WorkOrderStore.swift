@@ -6,6 +6,7 @@ import Supabase
 struct WOItem: Identifiable {
     var id: String { woNumber }
     var woNumber:    String
+    var vehicleIdRaw: String
     var vehicle:     String
     var assignedTo:  String?
     var description: String
@@ -22,12 +23,15 @@ struct WOItem: Identifiable {
         let diff = Int(Date().timeIntervalSince(createdAt))
         if diff < 3600  { return "\(diff / 60)m ago" }
         if diff < 86400 { return "\(diff / 3600)h ago" }
-        return "Yesterday"
+        let days = diff / 86400
+        if days == 1 { return "Yesterday" }
+        return "\(days)d ago"
     }
 
     // MARK: Convert from real DB model
     init(from wo: MaintenanceWorkOrder) {
         self.woNumber     = wo.id
+        self.vehicleIdRaw = wo.vehicleId ?? "Unknown"
         self.vehicle      = wo.vehicleId ?? "Unknown Vehicle"
         self.assignedTo   = wo.assignedTo
         self.description  = wo.description ?? ""
@@ -42,7 +46,7 @@ struct WOItem: Identifiable {
     func toMaintenanceWorkOrder() -> MaintenanceWorkOrder {
         MaintenanceWorkOrder(
             id:            woNumber,
-            vehicleId:     vehicle,
+            vehicleId:     vehicleIdRaw,
             createdBy:     nil,
             assignedTo:    assignedTo,
             description:   description,
@@ -55,10 +59,11 @@ struct WOItem: Identifiable {
     }
 
     // Manual memberwise init (for in-app creation without a DB round-trip)
-    init(woNumber: String, vehicle: String, assignedTo: String? = nil,
+    init(woNumber: String, vehicleIdRaw: String, vehicle: String, assignedTo: String? = nil,
          description: String, priority: Priority, status: Status,
          estimatedCost: Double? = nil, createdAt: Date, completedAt: Date? = nil) {
         self.woNumber     = woNumber
+        self.vehicleIdRaw = vehicleIdRaw
         self.vehicle      = vehicle
         self.assignedTo   = assignedTo
         self.description  = description
@@ -131,8 +136,8 @@ class WorkOrderStore {
     var isLoading: Bool = false
 
     func fetchWorkOrders() async {
-        isLoading = true
-        defer { isLoading = false }
+        await MainActor.run { isLoading = true }
+        defer { Task { @MainActor in isLoading = false } }
         
         do {
             async let fetchedWOsTask: [MaintenanceWorkOrder] = try SupabaseService.shared.client
@@ -217,13 +222,18 @@ class WorkOrderStore {
         return inserted
     }
 
+<<<<<<< HEAD
     func updateStatus(_ id: String, status: WOItem.Status) {
+=======
+    func updateStatus(_ id: String, status: WOItem.Status) async throws {
+>>>>>>> 8147c81 (Maintainace Module updated)
         guard let idx = orders.firstIndex(where: { $0.id == id }) else { return }
         var updatedItem = orders[idx]
         updatedItem.status = status
         updatedItem.completedAt = (status == .completed) ? Date() : nil
         let dbModel = updatedItem.toMaintenanceWorkOrder()
         
+<<<<<<< HEAD
         Task {
             do {
                 try await SupabaseService.shared.client
@@ -240,26 +250,32 @@ class WorkOrderStore {
                 }
             } catch {
                 print("Error updating status in DB: \(error)")
+=======
+        try await SupabaseService.shared.client
+            .from("maintenance_work_orders")
+            .update(dbModel)
+            .eq("id", value: dbModel.id)
+            .execute()
+        
+        await MainActor.run {
+            if let freshIdx = self.orders.firstIndex(where: { $0.id == id }) {
+                self.orders[freshIdx].status = status
+                self.orders[freshIdx].completedAt = updatedItem.completedAt
+>>>>>>> 8147c81 (Maintainace Module updated)
             }
         }
     }
 
-    func update(_ wo: WOItem) {
+    func update(_ wo: WOItem) async throws {
         let dbModel = wo.toMaintenanceWorkOrder()
-        Task {
-            do {
-                try await SupabaseService.shared.client
-                    .from("maintenance_work_orders")
-                    .update(dbModel)
-                    .eq("id", value: dbModel.id)
-                    .execute()
-                await MainActor.run {
-                    if let idx = self.orders.firstIndex(where: { $0.id == wo.id }) {
-                        self.orders[idx] = wo
-                    }
-                }
-            } catch {
-                print("Error updating work order in DB: \(error)")
+        try await SupabaseService.shared.client
+            .from("maintenance_work_orders")
+            .update(dbModel)
+            .eq("id", value: dbModel.id)
+            .execute()
+        await MainActor.run {
+            if let idx = self.orders.firstIndex(where: { $0.id == wo.id }) {
+                self.orders[idx] = wo
             }
         }
     }
@@ -273,6 +289,7 @@ class WorkOrderStore {
             .execute()
         await MainActor.run {
             self.orders.removeAll { $0.id == id }
+<<<<<<< HEAD
         }
     }
 
@@ -311,6 +328,34 @@ class WorkOrderStore {
                 }
             } catch {
                 print("Error removing part used from DB: \(error)")
+=======
+        }
+    }
+
+    func addPartUsed(_ part: MaintenancePartsUsed, to woId: String) async throws {
+        try await SupabaseService.shared.client
+            .from("maintenance_parts_used")
+            .insert(part)
+            .execute()
+            
+        await MainActor.run {
+            if let idx = self.orders.firstIndex(where: { $0.id == woId }) {
+                self.orders[idx].partsUsed.append(part)
+            }
+        }
+    }
+
+    func removePartUsed(_ partId: String, from woId: String) async throws {
+        try await SupabaseService.shared.client
+            .from("maintenance_parts_used")
+            .delete()
+            .eq("id", value: partId)
+            .execute()
+            
+        await MainActor.run {
+            if let idx = self.orders.firstIndex(where: { $0.id == woId }) {
+                self.orders[idx].partsUsed.removeAll { $0.id == partId }
+>>>>>>> 8147c81 (Maintainace Module updated)
             }
         }
     }

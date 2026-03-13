@@ -1,8 +1,8 @@
 import SwiftUI
 
-public struct InventoryView: View {
+struct InventoryView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @State private var store       = InventoryStore()
+    var store: InventoryStore
     @State private var showingAdd  = false
     @State private var searchText  = ""
     @State private var searchActive = false
@@ -29,7 +29,9 @@ public struct InventoryView: View {
         return list
     }
 
-    public init() {}
+    init(store: InventoryStore) {
+        self.store = store
+    }
 
     public var body: some View {
         NavigationStack {
@@ -313,5 +315,5 @@ struct RoundedCorner: Shape {
 }
 
 #Preview {
-    InventoryView()
+    InventoryView(store: InventoryStore())
 }

@@ -10,6 +10,8 @@ struct PartDetailView: View {
     @State private var showingReorder     = false
     @State private var showingDeleteAlert = false
     @State private var adjustQty: Int     = 0
+    @State private var errorMessage: String? = nil
+    @State private var showingError = false
 
     private var cardBg: Color {
         colorScheme == .dark ? Color(red: 28/255, green: 28/255, blue: 30/255) : FMSTheme.cardBackground
@@ -177,11 +179,27 @@ struct PartDetailView: View {
                                         guard adjustQty != 0 else { return }
                                         Task {
                                             do {
+<<<<<<< HEAD
                                                 part.stock = max(0, part.stock + adjustQty)
                                                 try await store.updatePart(part)
                                                 await MainActor.run { adjustQty = 0 }
                                             } catch {
                                                 print("Error adjusting stock: \(error)")
+=======
+                                                let newStock = max(0, part.stock + adjustQty)
+                                                var updatedPart = part
+                                                updatedPart.stock = newStock
+                                                try await store.updatePart(updatedPart)
+                                                await MainActor.run { 
+                                                    part.stock = newStock
+                                                    adjustQty = 0 
+                                                }
+                                            } catch {
+                                                await MainActor.run {
+                                                    errorMessage = error.localizedDescription
+                                                    showingError = true
+                                                }
+>>>>>>> 8147c81 (Maintainace Module updated)
                                             }
                                         }
                                     } label: {
@@ -262,6 +280,14 @@ struct PartDetailView: View {
         } message: {
             Text("Remove \"\(part.name)\" from inventory? This can't be undone.")
         }
+<<<<<<< HEAD
+=======
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
+>>>>>>> 8147c81 (Maintainace Module updated)
         .onChange(of: showingReorder) { _, isPresented in
             if !isPresented {
                 if let updated = store.parts.first(where: { $0.id == part.id }) { part = updated }

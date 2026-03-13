@@ -3,9 +3,9 @@ internal import Auth
 import Supabase
 
 struct CreateWorkOrderView: View {
-    var prefillVehicle: String = ""
+    let prefillVehicle: String
     /// Callback delivers a real MaintenanceWorkOrder ready for persistence
-    let onAdd: (MaintenanceWorkOrder) -> Void
+    let onAdd: (MaintenanceWorkOrder) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -24,7 +24,7 @@ struct CreateWorkOrderView: View {
 
     private var canSubmit: Bool { !vehicle.isEmpty && !description.isEmpty }
 
-    init(prefillVehicle: String = "", onAdd: @escaping (MaintenanceWorkOrder) -> Void) {
+    init(prefillVehicle: String = "", onAdd: @escaping (MaintenanceWorkOrder) async throws -> Void) {
         self.prefillVehicle = prefillVehicle
         self.onAdd = onAdd
     }
@@ -248,9 +248,11 @@ struct CreateWorkOrderView: View {
                 completedAt:   nil
             )
             
-            await MainActor.run {
-                onAdd(wo)
-                dismiss()
+            do {
+                try await onAdd(wo)
+                await MainActor.run { dismiss() }
+            } catch {
+                print("Failed to submit work order: \(error)")
             }
         }
     }

@@ -11,6 +11,8 @@ struct EditPartView: View {
     @State private var stock      = ""
     @State private var minStock   = ""
     @State private var unitCost   = ""
+    @State private var updateError: String? = nil
+    @State private var showUpdateError = false
 
     var body: some View {
         NavigationStack {
@@ -68,7 +70,16 @@ struct EditPartView: View {
                             updatedPart.partNumber = partNumber.isEmpty ? updatedPart.partNumber : partNumber
                             if let s = Int(stock) { updatedPart.stock = s }
                             if let m = Int(minStock) { updatedPart.minStock = m }
+<<<<<<< HEAD
                             updatedPart.unitCost = Double(unitCost)
+=======
+                            
+                            if let c = Double(unitCost) {
+                                updatedPart.unitCost = c
+                            } else if unitCost.trimmingCharacters(in: .whitespaces).isEmpty {
+                                updatedPart.unitCost = nil
+                            }
+>>>>>>> 8147c81 (Maintainace Module updated)
 
                             Task {
                                 do {
@@ -78,7 +89,14 @@ struct EditPartView: View {
                                         dismiss()
                                     }
                                 } catch {
+<<<<<<< HEAD
                                     print("Error updating part: \(error)")
+=======
+                                    await MainActor.run {
+                                        updateError = error.localizedDescription
+                                        showUpdateError = true
+                                    }
+>>>>>>> 8147c81 (Maintainace Module updated)
                                 }
                             }
                         } label: {
@@ -107,6 +125,11 @@ struct EditPartView: View {
                 stock = "\(part.stock)"
                 minStock = "\(part.minStock)"
                 unitCost = part.unitCost.map { String(format: "%.2f", $0) } ?? ""
+            }
+            .alert("Error Updating Part", isPresented: $showUpdateError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(updateError ?? "An unknown error occurred.")
             }
         }
     }
