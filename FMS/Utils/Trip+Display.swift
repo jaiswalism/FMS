@@ -10,10 +10,10 @@ extension Trip {
     }
     
     var displayRoute: String {
-        let texts = routeTexts
-        let start = texts.startText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let end = texts.endText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !start.isEmpty && !end.isEmpty {
+        let startRaw = startName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let endRaw = endName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !startRaw.isEmpty && !endRaw.isEmpty {
+            let texts = routeTexts
             return "\(texts.startText) to \(texts.endText)"
         }
         return "Trip"

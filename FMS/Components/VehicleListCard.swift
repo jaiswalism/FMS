@@ -71,27 +71,19 @@ struct VehicleListCard: View {
                 
                 // Action Buttons
                 HStack(spacing: 12) {
-                    Button {
-                        // Tracking flow not wired yet.
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .rotationEffect(.degrees(45))
-                                .offset(x: -2, y: 2)
-                            Text("Track")
-                                .font(.system(size: 14, weight: .bold))
+                    if isTrackable {
+                        Button {
+                            // TODO: Wire tracking flow.
+                        } label: {
+                            trackLabel
                         }
-                        .foregroundColor(FMSTheme.obsidian)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 20)
-                        .background(FMSTheme.amber)
-                        .cornerRadius(10)
+                        .buttonStyle(.plain)
+                    } else {
+                        trackLabel
+                            .opacity(0.6)
+                            .allowsHitTesting(false)
+                            .accessibilityHint("Tracking is unavailable.")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(true)
-                    .opacity(0.6)
-                    .accessibilityHint("Tracking is unavailable.")
                 }
                 .padding(.top, 4)
             }
@@ -118,12 +110,7 @@ struct VehicleListCard: View {
         case "maintenance": return "Maintenance"
         case "inactive": return "In Yard"
         default:
-            let trimmed = vehicle.status?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let raw = trimmed.isEmpty ? "Unknown" : trimmed
-            let readable = raw
-                .replacingOccurrences(of: "_", with: " ")
-                .replacingOccurrences(of: "-", with: " ")
-            return readable.capitalized
+            return cleanedStatus.capitalized
         }
     }
     
@@ -150,12 +137,41 @@ struct VehicleListCard: View {
         case "active": return FMSTheme.alertGreen
         case "maintenance": return FMSTheme.alertAmber
         case "inactive": return FMSTheme.textSecondary
-        default: return FMSTheme.statusColor(for: vehicle.status ?? "")
+        default: return FMSTheme.textSecondary
         }
     }
 
     private var normalizedStatus: String {
-        VehicleStatus.normalize(vehicle.status ?? "")
+        VehicleStatus.normalize(cleanedStatus)
+    }
+    
+    private var cleanedStatus: String {
+        let trimmed = vehicle.status?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let raw = trimmed.isEmpty ? "Unknown" : trimmed
+        return raw
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+    }
+    
+    private var isTrackable: Bool {
+        false
+    }
+    
+    private var trackLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "location.fill")
+                .font(.system(size: 14, weight: .bold))
+                .rotationEffect(.degrees(45))
+                .offset(x: -2, y: 2)
+            Text("Track")
+                .font(.system(size: 14, weight: .bold))
+        }
+        .foregroundColor(FMSTheme.obsidian)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .background(FMSTheme.amber)
+        .cornerRadius(10)
+        .accessibilityLabel("Track")
     }
     
     
