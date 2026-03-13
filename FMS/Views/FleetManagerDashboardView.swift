@@ -31,6 +31,7 @@ public struct FleetManagerDashboardView: View {
 // MARK: - Home Tab Content
 struct FleetManagerHomeTab: View {
     @State private var navigateToLiveFleet = false
+    @State private var navigateToProfile   = false
     
     // Mock data
     private let managerName = "Manager"
@@ -77,9 +78,11 @@ struct FleetManagerHomeTab: View {
                 .padding(.top, 16)
             }
             .background(FMSTheme.backgroundPrimary)
-            // Maps the boolean to the destination screen cleanly
             .navigationDestination(isPresented: $navigateToLiveFleet) {
                 LiveVehicleDashboardView()
+            }
+            .navigationDestination(isPresented: $navigateToProfile) {
+                ManagerProfileView()
             }
         }
     }
@@ -99,15 +102,19 @@ struct FleetManagerHomeTab: View {
             
             Spacer()
             
-            ZStack {
-                Circle()
-                    .fill(FMSTheme.borderLight)
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(FMSTheme.textTertiary)
+            Button {
+                navigateToProfile = true
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(FMSTheme.borderLight)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(FMSTheme.amber)
+                }
             }
+            .buttonStyle(.plain)
         }
     }
     
