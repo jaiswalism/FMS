@@ -13,8 +13,7 @@ public struct MainDashboardView: View {
             case .driver:
                 DriverDashboardView()
             case .maintenance:
-                // TODO: MaintenanceDashboardView
-                placeholderView(role: "Maintenance")
+                MaintenanceTabView()
             case .none:
                 placeholderView(role: "Unknown")
             }
