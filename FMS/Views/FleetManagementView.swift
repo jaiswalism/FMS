@@ -260,10 +260,10 @@ struct FilterPill: View {
                 
                 Text("\(count)")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(FMSTheme.obsidian)
+                    .foregroundColor(FMSTheme.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(FMSTheme.cardBackground)
+                    .background(FMSTheme.backgroundPrimary)
                     .cornerRadius(20)
             }
             .padding(.horizontal, 16)
