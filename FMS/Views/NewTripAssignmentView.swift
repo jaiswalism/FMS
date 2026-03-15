@@ -69,7 +69,7 @@ public struct NewTripAssignmentView: View {
                     
                     // Trip details embedded
                     tripInfoCard
-                    if trip.shipmentDescription != nil {
+                    if trip.shipmentDescription != nil || trip.shipmentWeightKg != nil || trip.shipmentPackageCount != nil || trip.fragile == true || trip.specialInstructions != nil {
                         shipmentCard
                     }
                     
@@ -89,24 +89,52 @@ public struct NewTripAssignmentView: View {
                 IssueReportView(viewModel: viewModel)
             }
             .fullScreenCover(isPresented: $showPreTripInspection) {
-                InspectionChecklistView(
-                    type: .preTrip,
-                    vehicleId: viewModel.assignedVehicle?.id ?? "VH-001",
-                    driverId: viewModel.driver.id,
-                    onCompletion: {
-                        preTripInspectionCompleted = true
+                if let vehicle = viewModel.assignedVehicle {
+                    InspectionChecklistView(
+                        type: .preTrip,
+                        vehicleId: vehicle.id,
+                        driverId: viewModel.driver.id,
+                        onCompletion: {
+                            preTripInspectionCompleted = true
+                        }
+                    )
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(FMSTheme.alertOrange)
+                        Text("No assigned vehicle found.")
+                            .font(.headline)
+                        Button("Dismiss") {
+                            showPreTripInspection = false
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                )
+                }
             }
             .fullScreenCover(isPresented: $showPostTripInspection) {
-                InspectionChecklistView(
-                    type: .postTrip,
-                    vehicleId: viewModel.assignedVehicle?.id ?? "VH-001",
-                    driverId: viewModel.driver.id,
-                    onCompletion: {
-                        postTripInspectionCompleted = true
+                if let vehicle = viewModel.assignedVehicle {
+                    InspectionChecklistView(
+                        type: .postTrip,
+                        vehicleId: vehicle.id,
+                        driverId: viewModel.driver.id,
+                        onCompletion: {
+                            postTripInspectionCompleted = true
+                        }
+                    )
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(FMSTheme.alertOrange)
+                        Text("No assigned vehicle found.")
+                            .font(.headline)
+                        Button("Dismiss") {
+                            showPostTripInspection = false
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                )
+                }
             }
             .onChange(of: showPreTripInspection) { _, isShowing in
                 if !isShowing {
@@ -133,30 +161,36 @@ public struct NewTripAssignmentView: View {
         let buttonContent = VStack(spacing: 10) {
             if trip.status?.lowercased() == "scheduled" {
                 Button {
-                    preTripInspectionCompleted = false
-                    showPreTripInspection = true
+                    if viewModel.assignedVehicle != nil {
+                        preTripInspectionCompleted = false
+                        showPreTripInspection = true
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 14, weight: .bold))
-                        Text("Start Trip")
+                        Text(viewModel.assignedVehicle == nil ? "Waiting for Vehicle" : "Start Trip")
                             .font(.headline.weight(.bold))
                     }
                 }
                 .buttonStyle(.fmsPrimary)
+                .disabled(viewModel.assignedVehicle == nil)
             } else if trip.status?.lowercased() == "active" {
                 Button {
-                    postTripInspectionCompleted = false
-                    showPostTripInspection = true
+                    if viewModel.assignedVehicle != nil {
+                        postTripInspectionCompleted = false
+                        showPostTripInspection = true
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "flag.checkered")
                             .font(.system(size: 14, weight: .bold))
-                        Text("End Trip")
+                        Text(viewModel.assignedVehicle == nil ? "Missing Vehicle" : "End Trip")
                             .font(.headline.weight(.bold))
                     }
                 }
                 .buttonStyle(.fmsPrimary)
+                .disabled(viewModel.assignedVehicle == nil)
 
                 Button {
                     showIssueReport = true
@@ -441,9 +475,13 @@ public struct NewTripAssignmentView: View {
         }
     }
 
-    private func formatDateTime(_ date: Date) -> String {
+    private static let dateTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "d MMM, h:mm a"
-        return formatter.string(from: date)
+        return formatter
+    }()
+    
+    private func formatDateTime(_ date: Date) -> String {
+        return Self.dateTimeFormatter.string(from: date)
     }
 }

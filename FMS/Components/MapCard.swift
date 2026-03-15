@@ -9,7 +9,7 @@ import SwiftUI
 import MapKit
 
 public struct MockStop: Identifiable, Equatable {
-    public let id = UUID()
+    public let id: String
     public let title: String
     public let address: String
     public let expectedTime: String
@@ -17,6 +17,7 @@ public struct MockStop: Identifiable, Equatable {
     public let coordinate: CLLocationCoordinate2D
     
     public init(title: String, address: String, expectedTime: String, stopType: StopType, coordinate: CLLocationCoordinate2D) {
+        self.id = "\(title)-\(coordinate.latitude)-\(coordinate.longitude)"
         self.title = title
         self.address = address
         self.expectedTime = expectedTime
@@ -119,8 +120,13 @@ public struct MapCard: View {
             request.transportType = .automobile
             
             let directions = MKDirections(request: request)
-            if let response = try? await directions.calculate(), let route = response.routes.first {
-                calculatedRoutes.append(route)
+            do {
+                let response = try await directions.calculate()
+                if let route = response.routes.first {
+                    calculatedRoutes.append(route)
+                }
+            } catch {
+                print("MapCard.fetchRoutes: failed to calculate route from \(source.coordinate) to \(destination.coordinate): \(error)")
             }
         }
         
