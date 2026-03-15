@@ -5,6 +5,7 @@ import SwiftUI
 public struct DriversView: View {
 
   @State private var vm = DriversViewModel()
+  @State private var showingAddDriver = false
 
   public init() {}
 
@@ -38,11 +39,15 @@ public struct DriversView: View {
         }
       }
       .scrollDismissesKeyboard(.interactively)
-      .background(FMSTheme.backgroundPrimary.ignoresSafeArea())
+      .background(Color(.systemGroupedBackground).ignoresSafeArea())
       .navigationTitle("")
       .navigationBarTitleDisplayMode(.inline)
       .searchable(text: $vm.searchText, prompt: "Search driver name or ID")
       .toolbar { toolbarContent }
+      .sheet(isPresented: $showingAddDriver) {
+        AddDriverView()
+          .presentationDetents([.large])
+      }
     }
   }
 
@@ -52,7 +57,7 @@ public struct DriversView: View {
   private var toolbarContent: some ToolbarContent {
     ToolbarItem(placement: .navigationBarTrailing) {
       Button {
-        // TODO: Add driver
+        showingAddDriver = true
       } label: {
         Image(systemName: "person.badge.plus")
           .fontWeight(.medium)
@@ -82,11 +87,11 @@ private struct DriversSummaryHeader: View {
       HStack(alignment: .firstTextBaseline) {
         Text("Drivers")
           .font(.largeTitle.bold())
-          .foregroundStyle(FMSTheme.textPrimary)
+          .foregroundStyle(Color(.label))
         Spacer()
         Text("\(vm.totalCount) Total")
           .font(.subheadline.weight(.semibold))
-          .foregroundStyle(FMSTheme.textSecondary)
+          .foregroundStyle(Color(.secondaryLabel))
       }
 
       // Amber summary card
@@ -102,7 +107,7 @@ private struct DriversSummaryHeader: View {
           LinearGradient(
             colors: [
               FMSTheme.amber,
-              FMSTheme.amberDark,
+              FMSTheme.amber.opacity(0.82),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -112,23 +117,23 @@ private struct DriversSummaryHeader: View {
       // Ghost icon
       Image(systemName: "person.2.fill")
         .font(.system(size: 90))
-        .foregroundStyle(FMSTheme.obsidian.opacity(0.12))
+        .foregroundStyle(Color(.systemBackground).opacity(0.09))
         .offset(x: 12, y: 18)
 
       // Content
       HStack(alignment: .top, spacing: 0) {
         VStack(alignment: .leading, spacing: 6) {
           Text("WORKFORCE")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(FMSTheme.obsidian.opacity(0.6))
+            .font(.caption.weight(.bold))
+            .foregroundStyle(Color(.systemBackground).opacity(0.7))
 
           Text("\(vm.onDutyCount) Active")
-            .font(.system(size: 36, weight: .bold))
-            .foregroundStyle(FMSTheme.obsidian)
+            .font(.system(size: 34, weight: .heavy, design: .rounded))
+            .foregroundStyle(Color(.systemBackground))
 
           Text("Drivers on duty right now")
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(FMSTheme.obsidian.opacity(0.7))
+            .font(.subheadline)
+            .foregroundStyle(Color(.systemBackground).opacity(0.75))
 
           // Stat pills
           HStack(spacing: 8) {
@@ -162,14 +167,14 @@ private struct StatPill: View {
   var body: some View {
     HStack(spacing: 4) {
       Image(systemName: icon)
-        .font(.system(size: 12, weight: .semibold))
+        .font(.caption2)
       Text("\(count) \(label)")
-        .font(.system(size: 12, weight: .semibold))
+        .font(.caption.weight(.semibold))
     }
-    .foregroundStyle(FMSTheme.obsidian)
+    .foregroundStyle(Color(.systemBackground).opacity(0.85))
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
-    .background(Color.white.opacity(0.7))
+    .background(Color(.systemBackground).opacity(0.18))
     .clipShape(Capsule())
   }
 }
@@ -282,24 +287,24 @@ private struct FilterChip: View {
           .padding(.vertical, 2)
           .background(
             isSelected
-              ? FMSTheme.backgroundPrimary.opacity(0.35)
-              : FMSTheme.pillBackground
+              ? Color.white.opacity(0.35)
+              : Color(.tertiarySystemFill)
           )
           .clipShape(Capsule())
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 8)
-      .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textPrimary)
+      .foregroundStyle(isSelected ? .white : Color(.label))
       .background {
         if isSelected {
           Capsule().fill(FMSTheme.amber)
         } else {
-          Capsule().fill(FMSTheme.cardBackground)
+          Capsule().fill(Color(.secondarySystemGroupedBackground))
         }
       }
       .overlay {
         if !isSelected {
-          Capsule().strokeBorder(FMSTheme.borderLight, lineWidth: 0.5)
+          Capsule().strokeBorder(Color(.separator), lineWidth: 0.5)
         }
       }
     }
@@ -329,10 +334,10 @@ private struct DayCell: View {
       VStack(spacing: 3) {
         Text(abbrev)
           .font(.caption2.weight(.semibold))
-          .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textSecondary)
+          .foregroundStyle(isSelected ? .white : Color(.secondaryLabel))
         Text(number)
           .font(.system(size: 16, weight: isSelected ? .bold : .regular, design: .rounded))
-          .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textPrimary)
+          .foregroundStyle(isSelected ? .white : Color(.label))
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 8)
@@ -364,10 +369,10 @@ private struct EmptyStateView: View {
     VStack(spacing: 16) {
       Image(systemName: icon)
         .font(.system(size: 44))
-        .foregroundStyle(FMSTheme.textTertiary)
+        .foregroundStyle(Color(.tertiaryLabel))
       Text(message)
         .font(.body)
-        .foregroundStyle(FMSTheme.textSecondary)
+        .foregroundStyle(Color(.secondaryLabel))
     }
     .frame(maxWidth: .infinity)
   }
