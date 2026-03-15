@@ -49,11 +49,10 @@ public struct NewTripAssignmentView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    
-                    // Map
+        ScrollView {
+            VStack(spacing: 24) {
+                
+                // Map
                     MapCard(stops: activeStops)
                         .frame(height: 240)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -79,17 +78,6 @@ public struct NewTripAssignmentView: View {
             .background(FMSTheme.backgroundPrimary.ignoresSafeArea())
             .navigationTitle("New Trip Assignment")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.bold))
-                            .foregroundColor(FMSTheme.textPrimary)
-                    }
-                }
-            }
             .safeAreaInset(edge: .bottom) {
                 bottomStickyButton
             }
@@ -134,7 +122,6 @@ public struct NewTripAssignmentView: View {
                     postTripInspectionCompleted = false
                 }
             }
-        }
     }
     
     @ViewBuilder
@@ -176,15 +163,11 @@ public struct NewTripAssignmentView: View {
                         Text("Report Issue")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    .foregroundStyle(FMSTheme.amber)
+                    .foregroundStyle(FMSTheme.textPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(FMSTheme.amber.opacity(0.12))
+                    .background(FMSTheme.pillBackground)
                     .cornerRadius(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(FMSTheme.amber.opacity(0.3), lineWidth: 1)
-                    )
                 }
                 .buttonStyle(.plain)
             } else {
@@ -236,35 +219,38 @@ public struct NewTripAssignmentView: View {
         }
     }
     
+    @ViewBuilder
     private var itinerarySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Trip Itinerary")
-                .font(.title3.weight(.bold))
-                .foregroundColor(FMSTheme.textPrimary)
-                .padding(.horizontal, 4)
-            
-            VStack(spacing: 0) {
-                ForEach(Array(activeStops.enumerated()), id: \.element.id) { index, stop in
-                    ItineraryRow(
-                        sequenceNumber: index + 1,
-                        title: stop.title,
-                        address: stop.address,
-                        expectedTime: stop.expectedTime,
-                        stopType: stop.stopType,
-                        isLast: index == activeStops.count - 1
-                    )
+        if !activeStops.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Trip Itinerary")
+                    .font(.title3.weight(.bold))
+                    .foregroundColor(FMSTheme.textPrimary)
+                    .padding(.horizontal, 4)
+                
+                VStack(spacing: 0) {
+                    ForEach(Array(activeStops.enumerated()), id: \.element.id) { index, stop in
+                        ItineraryRow(
+                            sequenceNumber: index + 1,
+                            title: stop.title,
+                            address: stop.address,
+                            expectedTime: stop.expectedTime,
+                            stopType: stop.stopType,
+                            isLast: index == activeStops.count - 1
+                        )
+                    }
                 }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(FMSTheme.cardBackground)
+                        .shadow(color: FMSTheme.shadowLarge, radius: 6, x: 0, y: 3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(FMSTheme.borderLight, lineWidth: 0.5)
+                        )
+                )
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(FMSTheme.cardBackground)
-                    .shadow(color: FMSTheme.shadowLarge, radius: 6, x: 0, y: 3)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(FMSTheme.borderLight, lineWidth: 0.5)
-                    )
-            )
         }
     }
     
@@ -288,10 +274,6 @@ public struct NewTripAssignmentView: View {
                 infoRow(label: "End Time", value: formatDateTime(end))
             }
 
-            if let duration = trip.actualDurationMin ?? trip.estimatedDurationMin {
-                let label = trip.actualDurationMin != nil ? "Duration" : "Est. Duration"
-                infoRow(label: label, value: duration.formattedDuration)
-            }
         }
         .padding(16)
         .background(FMSTheme.cardBackground)
