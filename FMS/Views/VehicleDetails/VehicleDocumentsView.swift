@@ -357,15 +357,16 @@ public struct VehicleDocumentDetailView: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                // Required to access security scoped files outside app sandbox
+                
+                // CRITICAL: Stop access to any previously selected file before picking a new one
+                selectedFileURL?.stopAccessingSecurityScopedResource()
+                
                 if url.startAccessingSecurityScopedResource() {
                     selectedFileURL = url
                     
-                    // Initialize a persistent ID for this new document if not already set
                     if document == nil && pendingDocumentID == nil {
                         pendingDocumentID = UUID().uuidString.lowercased()
                     }
-                    // We don't stop accessing here, we stop right after we read the Data before upload.
                 }
             case .failure(let error):
                 print("Failed to pick file: \(error)")
@@ -651,18 +652,22 @@ public struct VehicleDocumentDetailView: View {
                 let docID = document?.id ?? pendingDocumentID ?? UUID().uuidString.lowercased()
                 
                 if let url = selectedFileURL {
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    let data = try Data(contentsOf: url)
-                    // We don't stop access here anymore, defer handles it
+                    // Read data then immediately stop access to avoid leaks
+                    let data = try? Data(contentsOf: url)
+                    url.stopAccessingSecurityScopedResource()
+                    selectedFileURL = nil 
+                    
+                    guard let fileData = data else {
+                        throw NSError(domain: "FMS", code: 400, userInfo: [NSLocalizedDescriptionKey: "Could not read selected file"])
+                    }
                     
                     let fileName = "\(vehicleId)_\(slot.key)_\(docID.prefix(8)).pdf"
                     
-                    // Upload to Supabase Bucket
                     try await SupabaseService.shared.client.storage
                         .from("vehicle-documents")
                         .upload(
                             fileName,
-                            data: data,
+                            data: fileData,
                             options: FileOptions(contentType: "application/pdf")
                         )
                     
