@@ -163,11 +163,22 @@ public struct NewTripAssignmentView: View {
                         Text("Report Issue")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    .foregroundStyle(FMSTheme.textPrimary)
+                    .foregroundStyle(FMSTheme.amber)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(FMSTheme.pillBackground)
-                    .cornerRadius(14)
+                    .background {
+                        if #available(iOS 26, *) {
+                            FMSTheme.amber.opacity(0.15)
+                                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+                        } else {
+                            FMSTheme.amber.opacity(0.12)
+                                .cornerRadius(14)
+                        }
+                    }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(FMSTheme.amber.opacity(0.3), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
             } else {
