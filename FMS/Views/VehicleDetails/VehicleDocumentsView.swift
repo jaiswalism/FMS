@@ -849,13 +849,13 @@ private struct DetailField {
 }
 
 // MARK: - DocumentStatus enum
-public enum DocumentStatus {
+public enum VehicleDocumentStatus {
     case valid, expiringSoon, expired
 }
 
 // MARK: - VehicleDocument extension
 extension VehicleDocument {
-    public var documentStatus: DocumentStatus {
+    public var documentStatus: VehicleDocumentStatus {
         guard let expiry = expiryDate else { return .valid }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
