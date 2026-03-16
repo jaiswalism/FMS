@@ -4,7 +4,7 @@ import SwiftUI
 
 public struct DriversView: View {
 
-  @State private var vm = DriversViewModel()
+  @State private var vm = DriversViewModel(dataSource: SupabaseDriversDataSource())
   @State private var showingAddDriver = false
 
   public init() {}
@@ -40,12 +40,26 @@ public struct DriversView: View {
       }
       .scrollDismissesKeyboard(.interactively)
       .background(Color(.systemGroupedBackground).ignoresSafeArea())
+      .overlay {
+          if vm.isLoading && vm.drivers.isEmpty {
+              ProgressView("Loading workforce...")
+                  .tint(FMSTheme.amber)
+          }
+      }
+      .refreshable {
+          await vm.fetchData()
+      }
+      .task {
+          await vm.fetchData()
+      }
       .navigationTitle("")
       .navigationBarTitleDisplayMode(.inline)
       .searchable(text: $vm.searchText, prompt: "Search driver name or ID")
       .toolbar { toolbarContent }
       .sheet(isPresented: $showingAddDriver) {
-        AddDriverView()
+        AddDriverView(onDriverAdded: {
+            Task { await vm.fetchData() }
+        })
           .presentationDetents([.large])
       }
     }
