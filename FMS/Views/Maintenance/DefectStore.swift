@@ -104,7 +104,7 @@ struct DefectItem: Identifiable {
     // Manual memberwise init (for local creation before saving)
     init(id: UUID = UUID(), title: String, vehicleId: String, vehicleDisplay: String = "", category: String,
          priority: Priority, description: String, reportedAt: Date,
-         status: String = "open", tripId: String? = nil, linkedWorkOrderId: String? = nil) {
+         status: String = "open", tripId: String? = nil, imageUrls: [String]? = nil, linkedWorkOrderId: String? = nil) {
         self.id                = id
         self.title             = title
         self.vehicleId         = vehicleId
@@ -115,6 +115,7 @@ struct DefectItem: Identifiable {
         self.reportedAt        = reportedAt
         self.status            = status
         self.tripId            = tripId
+        self.imageUrls         = imageUrls
         self.linkedWorkOrderId = linkedWorkOrderId
     }
 }

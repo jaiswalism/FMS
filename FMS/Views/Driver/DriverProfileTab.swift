@@ -315,7 +315,7 @@ struct DriverProfileTab: View {
 
                 let details = documentDetails(for: doc.type)
                 VStack(spacing: 0) {
-                    ForEach(details, id: \.label) { detail in
+                    ForEach(Array(details.enumerated()), id: \.offset) { index, detail in
                         HStack {
                             Text(detail.label)
                                 .font(.system(size: 14, weight: .medium))
@@ -328,7 +328,7 @@ struct DriverProfileTab: View {
                         .padding(.vertical, 12)
                         .padding(.horizontal, 16)
 
-                        if detail.label != details.last?.label {
+                        if index != details.count - 1 {
                             Divider().background(FMSTheme.borderLight)
                                 .padding(.horizontal, 16)
                         }
