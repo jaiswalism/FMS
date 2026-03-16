@@ -6,107 +6,71 @@
 //
 
 import SwiftUI
-import MapKit
 
 public struct LocationTrackingConfirmationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     let trip: Trip
-    
-    // Simulate real-time tracking visualization
-    @State private var isPulsing = false
-    
+
     public init(trip: Trip) {
         self.trip = trip
     }
-    
+
     public var body: some View {
-        VStack(spacing: 0) {
-            
-            // Top Half: Map Tracking Overview
-            Map(position: $position) {
-                UserAnnotation()
-                
-                // Active Pulsing Indicator
-                if let lat = trip.startLat, let lng = trip.startLng {
-                    let startCoord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                    Annotation("Active Start", coordinate: startCoord) {
-                        ZStack {
-                            Circle()
-                                .fill(FMSTheme.statusColor(for: "active").opacity(0.3))
-                                .frame(width: isPulsing ? 100 : 20, height: isPulsing ? 100 : 20)
-                            
-                            Circle()
-                                .fill(FMSTheme.statusColor(for: "active"))
-                                .frame(width: 20, height: 20)
-                        }
+        NavigationStack {
+            VStack(spacing: 0) {
+                Spacer()
+
+                // Confirmation content — centered on screen
+                VStack(spacing: 24) {
+                    Image(systemName: "location.fill.viewfinder")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundStyle(FMSTheme.statusColor(for: "active"))
+                        .symbolEffect(.pulse.byLayer, options: .repeating)
+
+                    VStack(spacing: 10) {
+                        Text("Location Sharing Active")
+                            .font(.title.weight(.bold))
+                            .foregroundStyle(FMSTheme.textPrimary)
+
+                        Text("Your device is now broadcasting real-time coordinates. Dispatch and route tracking are recording this trip.")
+                            .font(.body)
+                            .foregroundStyle(FMSTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 32)
                     }
                 }
-            }
-            .mapStyle(.standard(elevation: .flat))
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-            }
-            .frame(height: UIScreen.main.bounds.height * 0.45)
-            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .shadow(color: FMSTheme.shadowLarge, radius: 16, x: 0, y: 8)
-            .padding(.top, 16)
-            .padding(.horizontal, 16)
-            
-            // Bottom Half: Confirmation Typography & Actions
-            VStack(spacing: 24) {
+
                 Spacer()
-                
-                // Icon & Headline
-                VStack(spacing: 12) {
-                    Image(systemName: "location.viewfinder")
-                        .font(.system(size: 48, weight: .light))
-                        .foregroundStyle(FMSTheme.statusColor(for: "active"))
-                        .symbolEffect(.pulse, options: .repeating)
-                    
-                    Text("Location Sharing Active")
-                        .font(.system(size: 28, weight: .heavy))
-                        .foregroundStyle(FMSTheme.textPrimary)
-                        .multilineTextAlignment(.center)
-                    
-                    Text("Your device is successfully sharing location coordinates for dispatch safety and accurate routing.")
-                        .font(.body)
-                        .foregroundStyle(FMSTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                }
-                
-                Spacer()
-                
-                // Proceed Button
+
+                // CTA — standard size matching other screens
                 Button {
-                    // Completes the flow and returns to parent (which drops them to active dashboard)
                     dismiss()
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .bold))
                         Text("Proceed to Route")
                             .font(.headline.weight(.bold))
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 16, weight: .bold))
                     }
-                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.fmsPrimary)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40) // Safe Area bumper
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
             .background(FMSTheme.backgroundPrimary)
-        }
-        .background(FMSTheme.backgroundPrimary.ignoresSafeArea())
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false)) {
-                isPulsing = true
-            }
-            
-            // Request user location centering if start coordinates are missing
-            if trip.startLat == nil {
-                position = .userLocation(fallback: .automatic)
+            .navigationTitle("Trip Started")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(FMSTheme.textTertiary)
+                    }
+                }
             }
         }
     }
