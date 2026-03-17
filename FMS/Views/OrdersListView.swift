@@ -108,7 +108,7 @@ public struct OrdersListView: View {
                                 NavigationLink(destination: OrderDetailView(order: order)) {
                                     orderCard(for: order)
                                 }
-                                .buttonStyle(.plain) // Prevents iOS from overriding text colors in the card
+                                .buttonStyle(.plain) // Prevents iOS from overriding text colors
                             }
                         }
                         .padding(.horizontal, 16)
@@ -181,7 +181,7 @@ public struct OrdersListView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Refined Order Card (No dual buttons)
+    // MARK: - Refined Order Card
     @ViewBuilder
     private func orderCard(for order: Order) -> some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -192,12 +192,19 @@ public struct OrdersListView: View {
                     .frame(width: 4)
                     .clipShape(RoundedRectangle(cornerRadius: 2))
 
-                VStack(alignment: .leading, spacing: 10) {
-                    // Header: Customer Name and Chevron
+                VStack(alignment: .leading, spacing: 12) {
+                    // Header: Order ID and Chevron
                     HStack {
-                        Text(order.customerName)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(FMSTheme.textPrimary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(order.orderNumber ?? "ORD-\(order.id.prefix(6).uppercased())")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(FMSTheme.textPrimary)
+                            
+                            Text(order.customerName)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(FMSTheme.textSecondary)
+                        }
+                        
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
@@ -205,22 +212,43 @@ public struct OrdersListView: View {
                     }
 
                     // Route
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
                         // Pickup
-                        HStack(alignment: .center, spacing: 12) {
-                            Circle().fill(Color.blue).frame(width: 10, height: 10)
-                            VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Circle().fill(Color.blue).frame(width: 10, height: 10).padding(.top, 4)
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("PICKUP").font(.system(size: 11, weight: .bold)).kerning(0.8).foregroundColor(.blue)
-                                Text(order.originName ?? "Unknown").font(.system(size: 15, weight: .semibold)).foregroundColor(FMSTheme.textPrimary)
+                                Text(shortAddress(order.originName))
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(FMSTheme.textPrimary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        // NEW: Intermediate Stops Indicator
+                        if let waypoints = order.waypoints, !waypoints.isEmpty {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "ellipsis")
+                                    .rotationEffect(.degrees(90))
+                                    .font(.system(size: 12, weight: .black))
+                                    .foregroundColor(FMSTheme.textTertiary)
+                                    .frame(width: 10)
+                                
+                                Text("\(waypoints.count) stop\(waypoints.count == 1 ? "" : "s")")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(FMSTheme.textSecondary)
                             }
                         }
                         
                         // Delivery
-                        HStack(alignment: .center, spacing: 12) {
-                            Circle().fill(Color.green).frame(width: 10, height: 10)
-                            VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Circle().fill(Color.green).frame(width: 10, height: 10).padding(.top, 4)
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("DELIVERY").font(.system(size: 11, weight: .bold)).kerning(0.8).foregroundColor(.green)
-                                Text(order.destinationName ?? "Unknown").font(.system(size: 15, weight: .semibold)).foregroundColor(FMSTheme.textPrimary)
+                                Text(shortAddress(order.destinationName))
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(FMSTheme.textPrimary)
+                                    .lineLimit(1)
                             }
                         }
                     }
@@ -229,17 +257,30 @@ public struct OrdersListView: View {
                     // Details Footer
                     HStack(spacing: 16) {
                         Label("\(String(format: "%.0f", order.totalWeightKg)) kg", systemImage: "shippingbox")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(FMSTheme.textSecondary)
                         
-                        // Show "Pending Assignment" if unassigned, else show ID
+                        Spacer()
+                        
+                        // Styled Status Pill
                         if order.isPending {
-                            Label("Pending Assignment", systemImage: "exclamationmark.circle")
+                            Text("Pending Assignment")
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(FMSTheme.alertOrange)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(FMSTheme.alertOrange.opacity(0.15))
+                                .clipShape(Capsule())
                         } else {
-                            Label("Trip • \(order.orderNumber ?? "—")", systemImage: "truck.box")
+                            Text(order.statusLabel.uppercased())
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Color.green)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.green.opacity(0.15))
+                                .clipShape(Capsule())
                         }
                     }
-                    .font(.system(size: 13, weight: order.isPending ? .medium : .regular))
-                    .foregroundColor(FMSTheme.textSecondary)
                 }
                 .padding(.vertical, 14)
                 .padding(.trailing, 14)
@@ -248,6 +289,13 @@ public struct OrdersListView: View {
         .background(FMSTheme.cardBackground)
         .cornerRadius(14)
         .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+    }
+
+    // Shortens a long address by grabbing just the first segment before the comma
+    private func shortAddress(_ address: String?) -> String {
+        guard let address = address, !address.isEmpty else { return "Unknown Location" }
+        let components = address.split(separator: ",")
+        return String(components.first ?? "").trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Helpers
@@ -259,20 +307,5 @@ public struct OrdersListView: View {
         case "low":    return FMSTheme.textTertiary
         default:       return FMSTheme.borderLight
         }
-    }
-}
-
-// Temporary Stub view for Phase 2 preparation
-public struct OrderDetailView: View {
-    public let order: Order
-    
-    public var body: some View {
-        VStack {
-            Text("Order Details for \(order.customerName)")
-                .font(.headline)
-            Text("Phase 2: Assignment Flow Goes Here")
-                .foregroundColor(.secondary)
-        }
-        .navigationTitle("Order Details")
     }
 }

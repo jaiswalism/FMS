@@ -40,7 +40,7 @@ struct LocationSearchSheet: View {
     var onSelect: (String, Double?, Double?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var searchVM = LocationSearchViewModel()
-    @State private var isResolving = false // Loading state for coordinate fetch
+    @State private var isResolving = false
 
     var body: some View {
         NavigationStack {
@@ -103,7 +103,6 @@ struct LocationSearchSheet: View {
         }
     }
     
-    // Convert autocomplete string into actual Lat/Lng coordinates
     private func resolveLocation(_ result: MKLocalSearchCompletion) {
         isResolving = true
         let request = MKLocalSearch.Request(completion: result)
@@ -116,7 +115,6 @@ struct LocationSearchSheet: View {
             if let coordinate = response?.mapItems.first?.placemark.coordinate {
                 onSelect(name, coordinate.latitude, coordinate.longitude)
             } else {
-                // Fallback to just the name if coordinate fetch fails
                 onSelect(name, nil, nil)
             }
             dismiss()
@@ -124,7 +122,7 @@ struct LocationSearchSheet: View {
     }
 }
 
-// MARK: - Cargo Type Model
+// MARK: - Models
 enum CargoType: String, CaseIterable {
     case general    = "general"
     case fragile    = "fragile"
@@ -163,7 +161,6 @@ enum CargoType: String, CaseIterable {
     }
 }
 
-// MARK: - Priority Model
 enum OrderPriority: String, CaseIterable {
     case low    = "low"
     case normal = "normal"
@@ -196,38 +193,36 @@ public struct CreateOrderView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: OrdersViewModel
 
-    // Form State
     @State private var customerName: String = ""
     @State private var customerPhone: String = ""
     @State private var customerEmail: String = ""
     @State private var weightString: String = ""
     @State private var packagesString: String = ""
     
-    // Origin State
     @State private var originName: String = ""
     @State private var originLat: Double? = nil
     @State private var originLng: Double? = nil
     
-    // Destination State
     @State private var destinationName: String = ""
     @State private var destinationLat: Double? = nil
     @State private var destinationLng: Double? = nil
     
+    // NEW: Waypoints
+    @State private var waypoints: [Waypoint] = []
+    
     @State private var specialInstructions: String = ""
 
-    // Typed pickers
     @State private var selectedCargoType: CargoType = .general
     @State private var selectedPriority: OrderPriority = .normal
 
-    // Dates
-    @State private var pickupDate: Date = Date()
-    @State private var deliveryDate: Date = Date().addingTimeInterval(60)
+    // Default +15 mins for pickup, +75 mins for delivery
+    @State private var pickupDate: Date = Date().addingTimeInterval(900)
+    @State private var deliveryDate: Date = Date().addingTimeInterval(4500)
 
-    // Location sheets
     @State private var showingOriginSearch = false
     @State private var showingDestinationSearch = false
+    @State private var showingWaypointSearch = false
 
-    // MARK: - Derived Validation
     private var trimmedOrigin: String { originName.trimmingCharacters(in: .whitespaces) }
     private var trimmedDestination: String { destinationName.trimmingCharacters(in: .whitespaces) }
     
@@ -248,7 +243,6 @@ public struct CreateOrderView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                // MARK: - Customer Information
                 Section(header: Text("Customer Information")) {
                     fmsField(title: "Customer Name *", placeholder: "Enter full name", icon: "person.fill", text: $customerName)
                     fmsField(title: "Phone Number", placeholder: "Enter phone number", icon: "phone.fill", text: $customerPhone, keyboard: .phonePad)
@@ -256,10 +250,40 @@ public struct CreateOrderView: View {
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
 
-                // MARK: - Route Details
                 Section(header: Text("Route Details")) {
                     locationPickerRow(title: "Origin *", placeholder: "Search pickup location", icon: "building.2.fill", value: originName) {
                         showingOriginSearch = true
+                    }
+
+                    // Waypoints List
+                    ForEach(waypoints.indices, id: \.self) { index in
+                        HStack {
+                            Image(systemName: "smallcircle.filled.circle.fill")
+                                .foregroundColor(FMSTheme.amber)
+                                .frame(width: 20)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Stop \(index + 1)").font(.caption).foregroundColor(Color(.secondaryLabel))
+                                Text(waypoints[index].name).font(.body).lineLimit(1)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                waypoints.remove(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundColor(FMSTheme.alertRed)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    // Add Stop Button
+                    Button(action: { showingWaypointSearch = true }) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill").foregroundColor(FMSTheme.amber)
+                            Text("Add Stop").font(.system(size: 15, weight: .medium)).foregroundColor(Color(.label))
+                        }
+                        .padding(.vertical, 4)
                     }
 
                     locationPickerRow(title: "Destination *", placeholder: "Search drop-off location", icon: "mappin.and.ellipse", value: destinationName) {
@@ -287,7 +311,6 @@ public struct CreateOrderView: View {
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
 
-                // MARK: - Cargo Specifications
                 Section(header: Text("Cargo Specifications")) {
                     fmsField(title: "Total Weight (kg) *", placeholder: "e.g. 500", icon: "scalemass.fill", text: $weightString, keyboard: .decimalPad)
                     fmsField(title: "Packages (Optional)", placeholder: "Count", icon: "shippingbox.fill", text: $packagesString, keyboard: .numberPad)
@@ -306,7 +329,6 @@ public struct CreateOrderView: View {
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
 
-                // MARK: - Additional Information
                 Section(header: Text("Additional Information")) {
                     TextField("Special Instructions...", text: $specialInstructions, axis: .vertical)
                         .lineLimit(3...6).padding(.vertical, 8)
@@ -354,10 +376,16 @@ public struct CreateOrderView: View {
                     self.destinationLng = lng
                 }
             }
+            .sheet(isPresented: $showingWaypointSearch) {
+                LocationSearchSheet(title: "Add Stop") { name, lat, lng in
+                    if let lat = lat, let lng = lng {
+                        waypoints.append(Waypoint(name: name, lat: lat, lng: lng))
+                    }
+                }
+            }
         }
     }
 
-    // MARK: - UI Builders (Remaining Unchanged)
     @ViewBuilder
     private func dropdownRow<MenuItems: View>(title: String, icon: String, iconColor: Color, selectedLabel: String, @ViewBuilder menuItems: @escaping () -> MenuItems) -> some View {
         Menu { menuItems() } label: {
@@ -414,7 +442,6 @@ public struct CreateOrderView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Submit Action
     private func submitOrder() {
         guard let weight = Double(weightString), weight > 0 else { return }
         let packages = Int(packagesString)
@@ -433,6 +460,7 @@ public struct CreateOrderView: View {
             destinationName: destinationName,
             destinationLat: destinationLat,
             destinationLng: destinationLng,
+            waypoints: waypoints.isEmpty ? nil : waypoints,
             requestedPickupAt: pickupDate,
             requestedDeliveryAt: deliveryDate,
             specialInstructions: specialInstructions.isEmpty ? nil : specialInstructions

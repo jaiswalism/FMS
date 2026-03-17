@@ -18,6 +18,7 @@ public struct OrderCreatePayload: Encodable {
     public let destinationName: String
     public let destinationLat: Double?
     public let destinationLng: Double?
+    public let waypoints: [Waypoint]?
     public let requestedPickupAt: Date?
     public let requestedDeliveryAt: Date?
     public let specialInstructions: String?
@@ -36,6 +37,7 @@ public struct OrderCreatePayload: Encodable {
         case destinationName     = "destination_name"
         case destinationLat      = "destination_lat"
         case destinationLng      = "destination_lng"
+        case waypoints
         case requestedPickupAt   = "requested_pickup_at"
         case requestedDeliveryAt = "requested_delivery_at"
         case specialInstructions = "special_instructions"
