@@ -77,7 +77,6 @@ public struct Order: Codable, Identifiable {
         default: return status?.capitalized ?? "Unknown"
         }
     }
-    // In Order.swift — add after statusLabel
 
     public var statusDisplay: String { statusLabel }
 
