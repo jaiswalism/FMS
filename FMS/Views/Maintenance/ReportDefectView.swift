@@ -14,7 +14,7 @@ struct ReportDefectView: View {
     @State private var defectTitle          = ""
     @State private var description          = ""
     @State private var selectedPriority     = DefectItem.Priority.medium
-    @State private var selectedCategory     = "mechanical"
+    @State private var selectedCategory     = "engine"
 
     // Vehicle picker state
     @State private var vehicles: [Vehicle]  = []
@@ -28,11 +28,11 @@ struct ReportDefectView: View {
 
     // DB-compatible categories (must match defects_category_check constraint)
     let categories: [(display: String, value: String)] = [
-        ("Mechanical",  "mechanical"),
+        ("Engine",      "engine"),
         ("Electrical",  "electrical"),
-        ("Tyres",       "tyres"),
+        ("Tires",       "tires"),
         ("Brakes",      "brakes"),
-        ("Body",        "body"),
+        ("Body Damage", "body_damage"),
         ("Other",       "other")
     ]
 
@@ -148,7 +148,7 @@ struct ReportDefectView: View {
                         if canSubmit {
                             HStack(spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill").foregroundColor(FMSTheme.amberDark)
-                                Text("\(selectedPriority.rawValue) · \(selectedCategory) · \(selectedPlate)")
+                                Text("\(selectedPriority.rawValue) · \(categories.first(where: { $0.value == selectedCategory })?.display ?? selectedCategory) · \(selectedPlate)")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(colorScheme == .dark ? .white : FMSTheme.textPrimary)
                             }

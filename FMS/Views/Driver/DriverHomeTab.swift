@@ -7,11 +7,14 @@ struct DriverHomeTab: View {
     @State private var preTripInspectionCompleted = false
     @State private var postTripInspectionCompleted = false
     @State private var showIssueReport = false
+    @State private var showFuelReceipt = false
     @State private var showProfile = false
     @State private var selectedTrip: Trip?
+    @State private var showLocationConfirmation = false
 
     /// Trip to start after pre-trip inspection completes
     @State private var pendingStartTrip: Trip?
+    @State private var showAllUpcomingJobs = false
 
     var body: some View {
         NavigationStack {
@@ -51,19 +54,35 @@ struct DriverHomeTab: View {
             .sheet(isPresented: $showIssueReport) {
                 IssueReportView(viewModel: viewModel)
             }
+            .sheet(isPresented: $showFuelReceipt) {
+                FuelReceiptScannerEntryView(tripID: viewModel.currentJob?.id)
+            }
             .sheet(isPresented: $showProfile) {
                 DriverProfileTab(viewModel: viewModel)
             }
             .navigationDestination(item: $selectedTrip) { trip in
                 NewTripAssignmentView(trip: trip, viewModel: viewModel)
             }
+            .navigationDestination(isPresented: $showAllUpcomingJobs) {
+                AllUpcomingJobsView(viewModel: viewModel)
+            }
             .onChange(of: showPreTripInspection) { _, isShowing in
                 if !isShowing {
                     if preTripInspectionCompleted, let trip = pendingStartTrip {
                         viewModel.startTrip(trip)
+                        showLocationConfirmation = true
                     }
-                    pendingStartTrip = nil
                     preTripInspectionCompleted = false
+                }
+            }
+            .fullScreenCover(isPresented: $showLocationConfirmation) {
+                if let trip = pendingStartTrip ?? viewModel.currentJob {
+                    LocationTrackingConfirmationView(trip: trip)
+                }
+            }
+            .onChange(of: showLocationConfirmation) { _, isShowing in
+                if !isShowing {
+                    pendingStartTrip = nil
                 }
             }
             .onChange(of: showPostTripInspection) { _, isShowing in
@@ -120,16 +139,6 @@ struct DriverHomeTab: View {
                     .foregroundStyle(FMSTheme.textPrimary)
 
                 Spacer()
-
-                if viewModel.currentJob != nil {
-                    Text("PRIORITY")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(FMSTheme.obsidian)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(FMSTheme.amber)
-                        .cornerRadius(6)
-                }
             }
 
             if let job = viewModel.currentJob {
@@ -163,19 +172,9 @@ struct DriverHomeTab: View {
         let upcoming = viewModel.remainingUpcomingTrips
         if !upcoming.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Upcoming Jobs")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(FMSTheme.textPrimary)
-
-                    Spacer()
-
-                    Button("View All") {
-                        viewModel.selectedSegment = .upcoming
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(FMSTheme.amber)
-                }
+                Text("Upcoming Jobs")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(FMSTheme.textPrimary)
 
                 ForEach(upcoming.prefix(3)) { trip in
                     UpcomingJobCard(trip: trip) {
@@ -223,6 +222,13 @@ struct DriverHomeTab: View {
                 title: "Report Issue",
                 subtitle: "Report a vehicle problem",
                 action: { showIssueReport = true }
+            )
+
+            QuickActionCard(
+                icon: "fuelpump.fill",
+                title: "Log Fuel Receipt",
+                subtitle: "Scan and submit fueling details",
+                action: { showFuelReceipt = true }
             )
         }
     }

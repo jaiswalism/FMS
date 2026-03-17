@@ -148,15 +148,3 @@ struct DriverTripsTab: View {
         .padding(.vertical, 48)
     }
 }
-
-// MARK: - Trip Hashable conformance for navigationDestination
-
-extension Trip: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    public static func == (lhs: Trip, rhs: Trip) -> Bool {
-        lhs.id == rhs.id
-    }
-}

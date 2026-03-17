@@ -12,8 +12,8 @@ struct EditDefectView: View {
     @State private var description = ""
     @State private var priority    = DefectItem.Priority.medium
 
-    let categories = ["mechanical", "electrical", "tyres", "brakes", "body", "other"]
-    @State private var category = "mechanical"
+    let categories = ["engine", "electrical", "tires", "brakes", "body_damage", "other"]
+    @State private var category = "engine"
     
     @State private var updateError: String? = nil
     @State private var showUpdateError = false
@@ -42,7 +42,7 @@ struct EditDefectView: View {
                                     HStack(spacing: 8) {
                                         ForEach(categories, id: \.self) { cat in
                                             Button { withAnimation { category = cat } } label: {
-                                                Text(cat).font(.system(size: 13, weight: .semibold))
+                                                Text(cat.replacingOccurrences(of: "_", with: " ").capitalized).font(.system(size: 13, weight: .semibold))
                                                     .padding(.horizontal, 14).padding(.vertical, 8)
                                                     .background(category == cat ? FMSTheme.amber : Color.gray.opacity(0.1))
                                                     .foregroundColor(category == cat ? .black : FMSTheme.textSecondary)

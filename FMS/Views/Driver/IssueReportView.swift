@@ -235,8 +235,19 @@ struct IssueReportView: View {
             photoData: photoData.isEmpty ? nil : photoData
         )
 
-        viewModel.submitIssueReport(report)
-        bannerManager.show(type: .success, message: "Issue report submitted successfully")
-        dismiss()
+        Task {
+            do {
+                try await viewModel.submitIssueReport(report)
+                await MainActor.run {
+                    bannerManager.show(type: .success, message: "Issue report submitted successfully")
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmitting = false
+                    bannerManager.show(type: .error, message: "Submit failed: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 }

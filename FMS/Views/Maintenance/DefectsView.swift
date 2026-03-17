@@ -10,13 +10,13 @@ public struct DefectsView: View {
     @State private var searchActive    = false
     @State private var showingReport   = false
 
-    let filters = ["All", "Critical", "Urgent", "Medium", "Low"]
+    let filters = ["All", "Critical", "High", "Medium", "Low"]
 
     var filteredDefects: [DefectItem] {
         var list = store.defects
         switch selectedFilter {
         case "Critical": list = list.filter { $0.priority == .critical }
-        case "Urgent":   list = list.filter { $0.priority == .urgent }
+        case "High":     list = list.filter { $0.priority == .high }
         case "Medium":   list = list.filter { $0.priority == .medium }
         case "Low":      list = list.filter { $0.priority == .low }
         default: break

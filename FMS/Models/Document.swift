@@ -28,7 +28,7 @@ enum DocumentType: String, CaseIterable, Identifiable, Codable {
 }
 
 enum DocumentStatus: String, Codable {
-    case active, verified, pending, expired
+    case active, verified, pending, expired, rejected
 
     var label: String {
         switch self {
@@ -36,6 +36,7 @@ enum DocumentStatus: String, Codable {
         case .verified: return "VERIFIED"
         case .pending: return "PENDING"
         case .expired: return "EXPIRED"
+        case .rejected: return "REJECTED"
         }
     }
 
@@ -44,7 +45,15 @@ enum DocumentStatus: String, Codable {
         case .active: return FMSTheme.alertGreen
         case .verified: return Color.blue
         case .pending: return FMSTheme.alertAmber
-        case .expired: return FMSTheme.alertRed
+        case .expired, .rejected: return FMSTheme.alertRed
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .active, .verified: return "checkmark.circle.fill"
+        case .pending: return "clock.fill"
+        case .expired, .rejected: return "exclamationmark.circle.fill"
         }
     }
 }

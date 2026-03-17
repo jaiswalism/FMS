@@ -9,8 +9,9 @@ struct DriverProfileTab: View {
     @State private var selectedDocType: DocumentType = .drivingLicense
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var documentLoadErrorMessage: String?
+    @State private var selectedDocument: UploadedDocument?
     @State private var uploadedDocuments: [UploadedDocument] = [
-        UploadedDocument(type: .drivingLicense, name: "Driving License", subtitle: "Expires Oct 24, 2025", status: .active),
+        UploadedDocument(type: .drivingLicense, name: "Driving License", subtitle: "Valid until Oct 24, 2025", status: .verified),
         UploadedDocument(type: .governmentId, name: "Government ID Proof", subtitle: "Verified - SSN Attached", status: .verified),
     ]
 
@@ -19,7 +20,6 @@ struct DriverProfileTab: View {
             ScrollView {
                 VStack(spacing: 20) {
                     profileHeader
-                    editProfileButton
                     documentsSection
                     vehicleCard
                     logoutButton
@@ -29,17 +29,11 @@ struct DriverProfileTab: View {
                 .padding(.bottom, 32)
             }
             .background(FMSTheme.backgroundPrimary)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {} label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(FMSTheme.textSecondary)
-                    }
-                }
-            }
             .sheet(isPresented: $showDocumentPicker) {
                 documentUploadSheet
+            }
+            .sheet(item: $selectedDocument) { doc in
+                documentDetailSheet(doc: doc)
             }
             .onChange(of: selectedPhoto) { _, newValue in
                 guard let item = newValue else { return }
@@ -84,26 +78,14 @@ struct DriverProfileTab: View {
 
     private var profileHeader: some View {
         VStack(spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .stroke(FMSTheme.amber.opacity(0.4), lineWidth: 2)
-                    .frame(width: 100, height: 100)
-                    .overlay(
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 90))
-                            .foregroundStyle(FMSTheme.textTertiary.opacity(0.5))
-                    )
-
-                ZStack {
-                    Circle()
-                        .fill(FMSTheme.cardBackground)
-                        .frame(width: 28, height: 28)
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(FMSTheme.amber)
-                }
-                .offset(x: 2, y: 2)
-            }
+            Circle()
+                .stroke(FMSTheme.amber.opacity(0.4), lineWidth: 2)
+                .frame(width: 100, height: 100)
+                .overlay(
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 90))
+                        .foregroundStyle(FMSTheme.textTertiary.opacity(0.5))
+                )
 
             Text(viewModel.driver.name)
                 .font(.system(size: 22, weight: .bold))
@@ -124,44 +106,21 @@ struct DriverProfileTab: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Edit Profile Button
-
-    private var editProfileButton: some View {
-        Button {} label: {
-            HStack(spacing: 8) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("Edit Profile")
-                    .font(.system(size: 15, weight: .bold))
-            }
-            .foregroundStyle(FMSTheme.obsidian)
-            .frame(maxWidth: 200)
-            .padding(.vertical, 12)
-            .background(FMSTheme.amber)
-            .cornerRadius(12)
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
-
     // MARK: - Documents Section
 
     private var documentsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Documents")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(FMSTheme.textPrimary)
-
-                Spacer()
-
-                Button("View All") {}
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(FMSTheme.amber)
-            }
+            Text("Documents")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(FMSTheme.textPrimary)
 
             ForEach(uploadedDocuments) { doc in
-                documentCard(doc: doc)
+                Button {
+                    selectedDocument = doc
+                } label: {
+                    documentCard(doc: doc)
+                }
+                .buttonStyle(.plain)
             }
 
             // Upload button
@@ -234,52 +193,76 @@ struct DriverProfileTab: View {
 
     // MARK: - Document Upload Sheet
 
+    private static let driverDocumentTypes: [DocumentType] = [.drivingLicense, .governmentId]
+
+    private var availableDocumentTypes: [DocumentType] {
+        Self.driverDocumentTypes.filter { type in
+            !uploadedDocuments.contains(where: { $0.type == type && $0.status != .expired && $0.status != .rejected })
+        }
+    }
+
     private var documentUploadSheet: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Text("Select Document Type")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(FMSTheme.textPrimary)
+                if availableDocumentTypes.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(FMSTheme.alertGreen)
+                        Text("All Documents Uploaded")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(FMSTheme.textPrimary)
+                        Text("All required documents have been added.")
+                            .font(.system(size: 14))
+                            .foregroundStyle(FMSTheme.textSecondary)
+                    }
+                    Spacer()
+                } else {
+                    Text("Select Document Type")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(FMSTheme.textPrimary)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(DocumentType.allCases) { type in
-                        let isSelected = selectedDocType == type
-                        Button {
-                            selectedDocType = type
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: type.icon)
-                                    .font(.system(size: 24, weight: .semibold))
-                                Text(type.displayName)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .multilineTextAlignment(.center)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        ForEach(availableDocumentTypes) { type in
+                            let isSelected = selectedDocType == type
+                            Button {
+                                selectedDocType = type
+                            } label: {
+                                VStack(spacing: 8) {
+                                    Image(systemName: type.icon)
+                                        .font(.system(size: 24, weight: .semibold))
+                                    Text(type.displayName)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .multilineTextAlignment(.center)
+                                }
+                                .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 18)
+                                .background(isSelected ? FMSTheme.amber : FMSTheme.cardBackground)
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(isSelected ? Color.clear : FMSTheme.borderLight, lineWidth: 1)
+                                )
                             }
-                            .foregroundStyle(isSelected ? FMSTheme.obsidian : FMSTheme.textSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                            .background(isSelected ? FMSTheme.amber : FMSTheme.cardBackground)
-                            .cornerRadius(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(isSelected ? Color.clear : FMSTheme.borderLight, lineWidth: 1)
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
 
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Choose File")
-                            .font(.system(size: 15, weight: .bold))
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.badge.plus")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Choose Photo")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                        .foregroundStyle(FMSTheme.obsidian)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(FMSTheme.amber)
+                        .cornerRadius(12)
                     }
-                    .foregroundStyle(FMSTheme.obsidian)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(FMSTheme.amber)
-                    .cornerRadius(12)
                 }
 
                 Spacer()
@@ -294,6 +277,12 @@ struct DriverProfileTab: View {
                         .foregroundStyle(FMSTheme.textSecondary)
                 }
             }
+            .onAppear {
+                // Auto-select first available type
+                if let first = availableDocumentTypes.first {
+                    selectedDocType = first
+                }
+            }
         }
         .presentationDetents([.medium])
         .alert("Unable to Upload Document", isPresented: documentLoadErrorPresented) {
@@ -302,6 +291,116 @@ struct DriverProfileTab: View {
             }
         } message: {
             Text(documentLoadErrorMessage ?? "Please try again.")
+        }
+    }
+
+    // MARK: - Document Detail Sheet
+
+    private func documentDetailSheet(doc: UploadedDocument) -> some View {
+        NavigationStack {
+            ScrollView {
+            VStack(spacing: 20) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(FMSTheme.amber.opacity(0.12))
+                        .frame(width: 80, height: 80)
+                    Image(systemName: doc.type.icon)
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundStyle(FMSTheme.amber)
+                }
+
+                Text(doc.name)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(FMSTheme.textPrimary)
+
+                let details = documentDetails(for: doc.type)
+                VStack(spacing: 0) {
+                    ForEach(Array(details.enumerated()), id: \.offset) { index, detail in
+                        HStack {
+                            Text(detail.label)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(FMSTheme.textSecondary)
+                            Spacer()
+                            Text(detail.value)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(FMSTheme.textPrimary)
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+
+                        if index != details.count - 1 {
+                            Divider().background(FMSTheme.borderLight)
+                                .padding(.horizontal, 16)
+                        }
+                    }
+                }
+                .background(FMSTheme.cardBackground)
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(FMSTheme.borderLight, lineWidth: 1)
+                )
+
+                HStack(spacing: 8) {
+                    Image(systemName: doc.status.systemImage)
+                        .foregroundStyle(doc.status.color)
+                    Text(doc.status.label)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(doc.status.color)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(doc.status.color.opacity(0.12))
+                .cornerRadius(10)
+
+            }
+            .padding(20)
+            .padding(.top, 8)
+            }
+            .background(FMSTheme.backgroundPrimary)
+            .navigationTitle(doc.type.displayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { selectedDocument = nil }
+                        .foregroundStyle(FMSTheme.amber)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func documentDetails(for type: DocumentType) -> [(label: String, value: String)] {
+        switch type {
+        case .drivingLicense:
+            return [
+                ("License No.", "DL-1420110012345"),
+                ("Name", viewModel.driver.name),
+                ("Date of Birth", "15 Mar 1990"),
+                ("Valid From", "10 Oct 2020"),
+                ("Valid Until", "24 Oct 2025"),
+                ("Category", "LMV / Transport"),
+            ]
+        case .governmentId:
+            return [
+                ("Aadhaar No.", "XXXX-XXXX-1234"),
+                ("Name", viewModel.driver.name),
+                ("Verification", "Verified"),
+                ("Issued By", "UIDAI"),
+            ]
+        case .vehicleRegistration:
+            return [
+                ("Reg. No.", viewModel.assignedVehicle?.plateNumber ?? "N/A"),
+                ("Owner", "FMS Fleet Pvt. Ltd."),
+                ("Valid Until", "Mar 2028"),
+            ]
+        case .insurance:
+            return [
+                ("Policy No.", "INS-2024-78432"),
+                ("Provider", "ICICI Lombard"),
+                ("Coverage", "Comprehensive"),
+                ("Valid Until", "Dec 2025"),
+            ]
         }
     }
 

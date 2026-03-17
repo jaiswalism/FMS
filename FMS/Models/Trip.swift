@@ -1,6 +1,8 @@
 import Foundation
 
-public struct Trip: Codable, Identifiable {
+public struct Trip: Codable, Identifiable, Hashable {
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    public static func == (lhs: Trip, rhs: Trip) -> Bool { lhs.id == rhs.id }
     public var id: String
     public var vehicleId: String?
     public var driverId: String?

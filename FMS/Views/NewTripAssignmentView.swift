@@ -13,12 +13,14 @@ public struct NewTripAssignmentView: View {
     let trip: Trip
     @Bindable var viewModel: DriverDashboardViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     
     @State private var showIssueReport = false
     @State private var showPreTripInspection = false
     @State private var showPostTripInspection = false
     @State private var preTripInspectionCompleted = false
     @State private var postTripInspectionCompleted = false
+    @State private var showLocationConfirmation = false
     
     private var activeStops: [MockStop] {
         var stops: [MockStop] = []
@@ -53,10 +55,10 @@ public struct NewTripAssignmentView: View {
             VStack(spacing: 24) {
                 
                 // Map
-                    MapCard(stops: activeStops)
-                        .frame(height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+                MapCard(stops: activeStops)
+                    .frame(height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
                     
                     // Stats
                     statsSection
@@ -140,9 +142,20 @@ public struct NewTripAssignmentView: View {
                 if !isShowing {
                     if preTripInspectionCompleted {
                         viewModel.startTrip(trip)
+                        openAppleMaps()
                         dismiss()
+                        // Trigger the tracking confirmation modal instead of dismissing immediately
+                        showLocationConfirmation = true
                     }
                     preTripInspectionCompleted = false
+                }
+            }
+            .fullScreenCover(isPresented: $showLocationConfirmation) {
+                LocationTrackingConfirmationView(trip: trip)
+            }
+            .onChange(of: showLocationConfirmation) { _, isShowing in
+                if !isShowing {
+                    dismiss() // Drop down to dashboard when splash finishes
                 }
             }
             .onChange(of: showPostTripInspection) { _, isShowing in
@@ -175,6 +188,10 @@ public struct NewTripAssignmentView: View {
                 }
                 .buttonStyle(.fmsPrimary)
                 .disabled(viewModel.assignedVehicle == nil)
+
+                if trip.endLat != nil && trip.endLng != nil {
+                    navigateButton
+                }
             } else if trip.status?.lowercased() == "active" {
                 Button {
                     if viewModel.assignedVehicle != nil {
@@ -473,6 +490,54 @@ public struct NewTripAssignmentView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(valueColor)
         }
+    }
+
+    // MARK: - Navigate Button
+
+    private var navigateButton: some View {
+        Button {
+            openAppleMaps()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "map.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Navigate")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(FMSTheme.amber)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background {
+                if #available(iOS 26, *) {
+                    FMSTheme.amber.opacity(0.15)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+                } else {
+                    FMSTheme.amber.opacity(0.12)
+                        .cornerRadius(14)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(FMSTheme.amber.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Apple Maps
+
+    private func openAppleMaps() {
+        guard let lat = trip.endLat, let lng = trip.endLng else { return }
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = "maps.apple.com"
+        components.queryItems = [
+            URLQueryItem(name: "daddr", value: "\(lat),\(lng)"),
+            URLQueryItem(name: "dname", value: trip.endName ?? "Destination"),
+            URLQueryItem(name: "dirflg", value: "d"),
+        ]
+        guard let url = components.url else { return }
+        openURL(url)
     }
 
     private static let dateTimeFormatter: DateFormatter = {
