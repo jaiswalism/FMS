@@ -105,7 +105,8 @@ public struct OrdersListView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredOrders) { order in
-                                NavigationLink(destination: OrderDetailView(order: order)) {
+                                // FIXED: Passing the viewModel here
+                                NavigationLink(destination: OrderDetailView(order: order, viewModel: viewModel)) {
                                     orderCard(for: order)
                                 }
                                 .buttonStyle(.plain) // Prevents iOS from overriding text colors

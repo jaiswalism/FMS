@@ -7,7 +7,6 @@
 
 import Foundation
 
-// MARK: - Shared Waypoint Model
 public struct Waypoint: Codable, Hashable {
     public let name: String
     public let lat: Double
@@ -81,8 +80,6 @@ public struct Order: Codable, Identifiable {
         case invoiceNumber      = "invoice_number"
     }
 
-    // MARK: - Computed
-
     public var statusLabel: String {
         switch status?.lowercased() {
         case "pending":    return "Pending"
@@ -95,21 +92,8 @@ public struct Order: Codable, Identifiable {
         }
     }
 
-    public var isPending: Bool {
-        status?.lowercased() == "pending"
-    }
-
-    public var isConfirmed: Bool {
-        status?.lowercased() == "confirmed"
-    }
-
-    public var isOngoing: Bool {
-        let s = status?.lowercased()
-        return s == "dispatched" || s == "in_transit"
-    }
-
-    public var isCompleted: Bool {
-        let s = status?.lowercased()
-        return s == "delivered" || s == "cancelled"
-    }
+    public var isPending: Bool { status?.lowercased() == "pending" }
+    public var isConfirmed: Bool { status?.lowercased() == "confirmed" }
+    public var isOngoing: Bool { let s = status?.lowercased(); return s == "dispatched" || s == "in_transit" }
+    public var isCompleted: Bool { let s = status?.lowercased(); return s == "delivered" || s == "cancelled" }
 }

@@ -9,32 +9,20 @@ import Foundation
 import SwiftUI
 import MapKit
 
-// MARK: - Location Search ViewModel
 @Observable
 final class LocationSearchViewModel: NSObject, MKLocalSearchCompleterDelegate {
     var results: [MKLocalSearchCompletion] = []
-    var searchText: String = "" {
-        didSet { completer.queryFragment = searchText }
-    }
-
+    var searchText: String = "" { didSet { completer.queryFragment = searchText } }
     private let completer = MKLocalSearchCompleter()
-
     override init() {
         super.init()
         completer.delegate = self
         completer.resultTypes = [.address, .pointOfInterest]
     }
-
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        results = completer.results
-    }
-
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        results = []
-    }
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) { results = completer.results }
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) { results = [] }
 }
 
-// MARK: - Location Search Sheet
 struct LocationSearchSheet: View {
     let title: String
     var onSelect: (String, Double?, Double?) -> Void
@@ -46,39 +34,19 @@ struct LocationSearchSheet: View {
         NavigationStack {
             List {
                 if searchVM.results.isEmpty && searchVM.searchText.isEmpty {
-                    ContentUnavailableView(
-                        "Search for a location",
-                        systemImage: "magnifyingglass",
-                        description: Text("Type an address or place name")
-                    )
-                    .listRowBackground(Color.clear)
+                    ContentUnavailableView("Search for a location", systemImage: "magnifyingglass", description: Text("Type an address or place name")).listRowBackground(Color.clear)
                 } else if searchVM.results.isEmpty {
-                    ContentUnavailableView(
-                        "No results",
-                        systemImage: "mappin.slash",
-                        description: Text("Try a different search term")
-                    )
-                    .listRowBackground(Color.clear)
+                    ContentUnavailableView("No results", systemImage: "mappin.slash", description: Text("Try a different search term")).listRowBackground(Color.clear)
                 } else {
                     ForEach(searchVM.results, id: \.self) { result in
-                        Button {
-                            resolveLocation(result)
-                        } label: {
+                        Button { resolveLocation(result) } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(result.title)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.primary)
-                                    if !result.subtitle.isEmpty {
-                                        Text(result.subtitle)
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.secondary)
-                                    }
+                                    Text(result.title).font(.system(size: 15, weight: .medium)).foregroundColor(.primary)
+                                    if !result.subtitle.isEmpty { Text(result.subtitle).font(.system(size: 13)).foregroundColor(.secondary) }
                                 }
                                 Spacer()
-                                if isResolving {
-                                    ProgressView().scaleEffect(0.8)
-                                }
+                                if isResolving { ProgressView().scaleEffect(0.8) }
                             }
                             .padding(.vertical, 4)
                         }
@@ -88,30 +56,19 @@ struct LocationSearchSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .searchable(
-                text: $searchVM.searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search address or place"
-            )
+            .searchable(text: $searchVM.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search address or place")
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() } } }
         }
     }
     
     private func resolveLocation(_ result: MKLocalSearchCompletion) {
         isResolving = true
         let request = MKLocalSearch.Request(completion: result)
-        let search = MKLocalSearch(request: request)
-        
-        search.start { response, error in
+        MKLocalSearch(request: request).start { response, _ in
             isResolving = false
             let name = result.title + (result.subtitle.isEmpty ? "" : ", \(result.subtitle)")
-            
             if let coordinate = response?.mapItems.first?.placemark.coordinate {
                 onSelect(name, coordinate.latitude, coordinate.longitude)
             } else {
@@ -122,73 +79,33 @@ struct LocationSearchSheet: View {
     }
 }
 
-// MARK: - Models
 enum CargoType: String, CaseIterable {
-    case general    = "general"
-    case fragile    = "fragile"
-    case perishable = "perishable"
-    case hazardous  = "hazardous"
-    case oversized  = "oversized"
-
-    var label: String {
-        switch self {
-        case .general:    return "General"
-        case .fragile:    return "Fragile"
-        case .perishable: return "Perishable"
-        case .hazardous:  return "Hazardous"
-        case .oversized:  return "Oversized"
-        }
-    }
-
+    case general = "general", fragile = "fragile", perishable = "perishable", hazardous = "hazardous", oversized = "oversized"
+    var label: String { rawValue.capitalized }
     var systemIcon: String {
-        switch self {
-        case .general:    return "shippingbox.fill"
-        case .fragile:    return "hand.raised.fill"
-        case .perishable: return "thermometer.snowflake"
-        case .hazardous:  return "exclamationmark.triangle.fill"
-        case .oversized:  return "cube.box.fill"
-        }
+        switch self { case .general: return "shippingbox.fill"; case .fragile: return "hand.raised.fill"; case .perishable: return "thermometer.snowflake"; case .hazardous: return "exclamationmark.triangle.fill"; case .oversized: return "cube.box.fill" }
     }
-
     var color: Color {
-        switch self {
-        case .general:    return .blue
-        case .fragile:    return .purple
-        case .perishable: return .cyan
-        case .hazardous:  return .orange
-        case .oversized:  return .brown
-        }
+        switch self { case .general: return .blue; case .fragile: return .purple; case .perishable: return .cyan; case .hazardous: return .orange; case .oversized: return .brown }
     }
 }
 
 enum OrderPriority: String, CaseIterable {
-    case low    = "low"
-    case normal = "normal"
-    case high   = "high"
-    case urgent = "urgent"
-
+    case low = "low", normal = "normal", high = "high", urgent = "urgent"
     var label: String { rawValue.capitalized }
-
     var systemIcon: String {
-        switch self {
-        case .low:    return "arrow.down.circle.fill"
-        case .normal: return "minus.circle.fill"
-        case .high:   return "arrow.up.circle.fill"
-        case .urgent: return "exclamationmark.2"
-        }
+        switch self { case .low: return "arrow.down.circle.fill"; case .normal: return "minus.circle.fill"; case .high: return "arrow.up.circle.fill"; case .urgent: return "exclamationmark.2" }
     }
-
     var color: Color {
-        switch self {
-        case .low:    return .gray
-        case .normal: return .blue
-        case .high:   return .orange
-        case .urgent: return .red
-        }
+        switch self { case .low: return .gray; case .normal: return .blue; case .high: return .orange; case .urgent: return .red }
     }
 }
 
-// MARK: - CreateOrderView
+enum AssignmentPreference: String, CaseIterable {
+    case later = "Assign Later"
+    case now = "Assign Now"
+}
+
 public struct CreateOrderView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: OrdersViewModel
@@ -196,48 +113,50 @@ public struct CreateOrderView: View {
     @State private var customerName: String = ""
     @State private var customerPhone: String = ""
     @State private var customerEmail: String = ""
-    @State private var weightString: String = ""
-    @State private var packagesString: String = ""
     
     @State private var originName: String = ""
     @State private var originLat: Double? = nil
     @State private var originLng: Double? = nil
-    
+    @State private var waypoints: [Waypoint] = []
     @State private var destinationName: String = ""
     @State private var destinationLat: Double? = nil
     @State private var destinationLng: Double? = nil
-    
-    // NEW: Waypoints
-    @State private var waypoints: [Waypoint] = []
-    
-    @State private var specialInstructions: String = ""
-
-    @State private var selectedCargoType: CargoType = .general
-    @State private var selectedPriority: OrderPriority = .normal
-
-    // Default +15 mins for pickup, +75 mins for delivery
     @State private var pickupDate: Date = Date().addingTimeInterval(900)
     @State private var deliveryDate: Date = Date().addingTimeInterval(4500)
+    
+    @State private var assignmentPref: AssignmentPreference = .later
+    @State private var selectedDriverId: String? = nil
+    @State private var selectedDriverName: String = ""
+    @State private var selectedVehicleId: String? = nil
+    @State private var selectedVehicleName: String = ""
+    
+    @State private var weightString: String = ""
+    @State private var packagesString: String = ""
+    @State private var selectedCargoType: CargoType = .general
+    @State private var selectedPriority: OrderPriority = .normal
+    @State private var specialInstructions: String = ""
 
     @State private var showingOriginSearch = false
     @State private var showingDestinationSearch = false
     @State private var showingWaypointSearch = false
+    @State private var showingDriverSearch = false
+    @State private var showingVehicleSearch = false
 
     private var trimmedOrigin: String { originName.trimmingCharacters(in: .whitespaces) }
     private var trimmedDestination: String { destinationName.trimmingCharacters(in: .whitespaces) }
-    
-    private var isSameLocation: Bool {
-        !trimmedOrigin.isEmpty && !trimmedDestination.isEmpty && trimmedOrigin.lowercased() == trimmedDestination.lowercased()
-    }
+    private var isSameLocation: Bool { !trimmedOrigin.isEmpty && !trimmedDestination.isEmpty && trimmedOrigin.lowercased() == trimmedDestination.lowercased() }
     
     private var isFormValid: Bool {
-        !customerName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !trimmedOrigin.isEmpty &&
-        !trimmedDestination.isEmpty &&
-        !isSameLocation &&
-        (Double(weightString) ?? 0) > 0 &&
-        pickupDate >= Date().addingTimeInterval(-60) &&
-        deliveryDate >= pickupDate.addingTimeInterval(60)
+        let baseValid = !customerName.trimmingCharacters(in: .whitespaces).isEmpty &&
+            !trimmedOrigin.isEmpty && !trimmedDestination.isEmpty && !isSameLocation &&
+            (Double(weightString) ?? 0) > 0 &&
+            pickupDate >= Date().addingTimeInterval(-60) &&
+            deliveryDate >= pickupDate.addingTimeInterval(60)
+        
+        if assignmentPref == .now {
+            return baseValid && selectedDriverId != nil && selectedVehicleId != nil
+        }
+        return baseValid
     }
 
     public var body: some View {
@@ -251,33 +170,21 @@ public struct CreateOrderView: View {
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
 
                 Section(header: Text("Route Details")) {
-                    locationPickerRow(title: "Origin *", placeholder: "Search pickup location", icon: "building.2.fill", value: originName) {
-                        showingOriginSearch = true
-                    }
-
-                    // Waypoints List
+                    locationPickerRow(title: "Origin *", placeholder: "Search pickup location", icon: "building.2.fill", value: originName) { showingOriginSearch = true }
+                    
                     ForEach(waypoints.indices, id: \.self) { index in
                         HStack {
-                            Image(systemName: "smallcircle.filled.circle.fill")
-                                .foregroundColor(FMSTheme.amber)
-                                .frame(width: 20)
-                            
+                            Image(systemName: "smallcircle.filled.circle.fill").foregroundColor(FMSTheme.amber).frame(width: 20)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Stop \(index + 1)").font(.caption).foregroundColor(Color(.secondaryLabel))
                                 Text(waypoints[index].name).font(.body).lineLimit(1)
                             }
                             Spacer()
-                            Button(role: .destructive) {
-                                waypoints.remove(at: index)
-                            } label: {
-                                Image(systemName: "minus.circle.fill").foregroundColor(FMSTheme.alertRed)
-                            }
-                            .buttonStyle(.plain)
+                            Button(role: .destructive) { waypoints.remove(at: index) } label: { Image(systemName: "minus.circle.fill").foregroundColor(FMSTheme.alertRed) }.buttonStyle(.plain)
                         }
                         .padding(.vertical, 4)
                     }
 
-                    // Add Stop Button
                     Button(action: { showingWaypointSearch = true }) {
                         HStack {
                             Image(systemName: "plus.circle.fill").foregroundColor(FMSTheme.amber)
@@ -286,27 +193,31 @@ public struct CreateOrderView: View {
                         .padding(.vertical, 4)
                     }
 
-                    locationPickerRow(title: "Destination *", placeholder: "Search drop-off location", icon: "mappin.and.ellipse", value: destinationName) {
-                        showingDestinationSearch = true
-                    }
+                    locationPickerRow(title: "Destination *", placeholder: "Search drop-off location", icon: "mappin.and.ellipse", value: destinationName) { showingDestinationSearch = true }
 
-                    if isSameLocation {
-                        Label("Origin and destination cannot be the same.", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundColor(.red).listRowBackground(Color(.secondarySystemGroupedBackground))
-                    }
+                    if isSameLocation { Label("Origin and destination cannot be the same.", systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundColor(.red).listRowBackground(Color(.secondarySystemGroupedBackground)) }
 
                     DatePicker("Requested Pickup", selection: $pickupDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                        .onChange(of: pickupDate) { _, newPickup in
-                            if deliveryDate < newPickup.addingTimeInterval(60) {
-                                deliveryDate = newPickup.addingTimeInterval(60)
-                            }
-                        }
-
+                        .onChange(of: pickupDate) { _, newPickup in if deliveryDate < newPickup.addingTimeInterval(60) { deliveryDate = newPickup.addingTimeInterval(60) } }
                     DatePicker("Requested Delivery", selection: $deliveryDate, in: pickupDate.addingTimeInterval(60)..., displayedComponents: [.date, .hourAndMinute])
+                }
+                .listRowBackground(Color(.secondarySystemGroupedBackground))
 
-                    if deliveryDate < pickupDate.addingTimeInterval(60) {
-                        Label("Delivery must be at least 1 minute after pickup.", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundColor(.red)
+                Section(header: Text("Driver & Vehicle Assignment")) {
+                    Picker("Assignment Preference", selection: $assignmentPref) {
+                        Text("Assign Later").tag(AssignmentPreference.later)
+                        Text("Assign Now").tag(AssignmentPreference.now)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 4)
+                    
+                    if assignmentPref == .now {
+                        locationPickerRow(title: "Driver *", placeholder: "Select available driver", icon: "steeringwheel", value: selectedDriverName) {
+                            showingDriverSearch = true
+                        }
+                        locationPickerRow(title: "Vehicle *", placeholder: "Select available vehicle", icon: "truck.box.fill", value: selectedVehicleName) {
+                            showingVehicleSearch = true
+                        }
                     }
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
@@ -314,24 +225,17 @@ public struct CreateOrderView: View {
                 Section(header: Text("Cargo Specifications")) {
                     fmsField(title: "Total Weight (kg) *", placeholder: "e.g. 500", icon: "scalemass.fill", text: $weightString, keyboard: .decimalPad)
                     fmsField(title: "Packages (Optional)", placeholder: "Count", icon: "shippingbox.fill", text: $packagesString, keyboard: .numberPad)
-
                     dropdownRow(title: "Cargo Type", icon: selectedCargoType.systemIcon, iconColor: selectedCargoType.color, selectedLabel: selectedCargoType.label) {
-                        ForEach(CargoType.allCases, id: \.self) { type in
-                            Button { selectedCargoType = type } label: { Label(type.label, systemImage: type.systemIcon) }
-                        }
+                        ForEach(CargoType.allCases, id: \.self) { type in Button { selectedCargoType = type } label: { Label(type.label, systemImage: type.systemIcon) } }
                     }
-
                     dropdownRow(title: "Priority", icon: selectedPriority.systemIcon, iconColor: selectedPriority.color, selectedLabel: selectedPriority.label) {
-                        ForEach(OrderPriority.allCases, id: \.self) { priority in
-                            Button { selectedPriority = priority } label: { Label(priority.label, systemImage: priority.systemIcon) }
-                        }
+                        ForEach(OrderPriority.allCases, id: \.self) { priority in Button { selectedPriority = priority } label: { Label(priority.label, systemImage: priority.systemIcon) } }
                     }
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
 
                 Section(header: Text("Additional Information")) {
-                    TextField("Special Instructions...", text: $specialInstructions, axis: .vertical)
-                        .lineLimit(3...6).padding(.vertical, 8)
+                    TextField("Special Instructions...", text: $specialInstructions, axis: .vertical).lineLimit(3...6).padding(.vertical, 8)
                 }
                 .listRowBackground(Color(.secondarySystemGroupedBackground))
             }
@@ -340,47 +244,28 @@ public struct CreateOrderView: View {
             .navigationTitle("New Order")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel", role: .cancel) { dismiss() }
-                }
+                ToolbarItem(placement: .navigationBarLeading) { Button("Cancel", role: .cancel) { dismiss() } }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: submitOrder) {
-                        if viewModel.isCreating {
-                            ProgressView().progressViewStyle(.circular).tint(.accentColor)
-                        } else {
-                            Text("Create").fontWeight(.semibold)
-                        }
-                    }
-                    .disabled(!isFormValid || viewModel.isCreating)
+                        if viewModel.isCreating { ProgressView().progressViewStyle(.circular).tint(.accentColor) } else { Text("Create").fontWeight(.semibold) }
+                    }.disabled(!isFormValid || viewModel.isCreating)
                 }
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("OK") { viewModel.errorMessage = nil }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
+            .task {
+                // Fetch LIVE Drivers and Vehicles from your DB when the view opens!
+                await viewModel.fetchAvailableResources()
             }
-            .sheet(isPresented: $showingOriginSearch) {
-                LocationSearchSheet(title: "Pickup Location") { name, lat, lng in
-                    self.originName = name
-                    self.originLat = lat
-                    self.originLng = lng
+            .sheet(isPresented: $showingOriginSearch) { LocationSearchSheet(title: "Pickup Location") { name, lat, lng in self.originName = name; self.originLat = lat; self.originLng = lng } }
+            .sheet(isPresented: $showingDestinationSearch) { LocationSearchSheet(title: "Drop-off Location") { name, lat, lng in self.destinationName = name; self.destinationLat = lat; self.destinationLng = lng } }
+            .sheet(isPresented: $showingWaypointSearch) { LocationSearchSheet(title: "Add Stop") { name, lat, lng in if let lat = lat, let lng = lng { waypoints.append(Waypoint(name: name, lat: lat, lng: lng)) } } }
+            .sheet(isPresented: $showingDriverSearch) {
+                ResourcePickerSheet(title: "Select Driver", icon: "person.circle.fill", items: viewModel.availableDrivers.map { ($0.id, $0.name) }) { id, name in
+                    self.selectedDriverId = id; self.selectedDriverName = name
                 }
             }
-            .sheet(isPresented: $showingDestinationSearch) {
-                LocationSearchSheet(title: "Drop-off Location") { name, lat, lng in
-                    self.destinationName = name
-                    self.destinationLat = lat
-                    self.destinationLng = lng
-                }
-            }
-            .sheet(isPresented: $showingWaypointSearch) {
-                LocationSearchSheet(title: "Add Stop") { name, lat, lng in
-                    if let lat = lat, let lng = lng {
-                        waypoints.append(Waypoint(name: name, lat: lat, lng: lng))
-                    }
+            .sheet(isPresented: $showingVehicleSearch) {
+                ResourcePickerSheet(title: "Select Vehicle", icon: "truck.box.fill", items: viewModel.availableVehicles.map { ($0.id, "\($0.plateNumber) (\($0.manufacturer ?? "") \($0.model ?? ""))") }) { id, name in
+                    self.selectedVehicleId = id; self.selectedVehicleName = name
                 }
             }
         }
@@ -393,11 +278,7 @@ public struct CreateOrderView: View {
                 Image(systemName: icon).foregroundColor(iconColor).frame(width: 20)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.caption).foregroundColor(Color(.secondaryLabel))
-                    HStack(spacing: 4) {
-                        Text(selectedLabel).font(.body).foregroundColor(Color(.label))
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .medium)).foregroundColor(Color(.tertiaryLabel))
-                    }
+                    HStack(spacing: 4) { Text(selectedLabel).font(.body).foregroundColor(Color(.label)); Spacer(); Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .medium)).foregroundColor(Color(.tertiaryLabel)) }
                 }
             }
             .padding(.vertical, 4)
@@ -413,13 +294,10 @@ public struct CreateOrderView: View {
                 Image(systemName: icon).foregroundColor(Color(.secondaryLabel)).frame(width: 20)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.caption).foregroundColor(Color(.secondaryLabel))
-                    Text(value.isEmpty ? placeholder : value)
-                        .font(.body)
-                        .foregroundColor(value.isEmpty ? Color(.placeholderText) : Color(.label))
-                        .lineLimit(1)
+                    Text(value.isEmpty ? placeholder : value).font(.body).foregroundColor(value.isEmpty ? Color(.placeholderText) : Color(.label)).lineLimit(1)
                 }
                 Spacer()
-                Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundColor(Color(.tertiaryLabel))
+                Image(systemName: "chevron.right").font(.system(size: 14)).foregroundColor(Color(.tertiaryLabel))
             }
             .padding(.vertical, 4)
         }
@@ -432,11 +310,7 @@ public struct CreateOrderView: View {
             Image(systemName: icon).foregroundColor(Color(.secondaryLabel)).frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.caption).foregroundColor(Color(.secondaryLabel))
-                TextField(placeholder, text: text)
-                    .keyboardType(keyboard)
-                    .foregroundColor(Color(.label))
-                    .autocorrectionDisabled(keyboard == .emailAddress)
-                    .textInputAutocapitalization(keyboard == .emailAddress ? .never : .sentences)
+                TextField(placeholder, text: text).keyboardType(keyboard).foregroundColor(Color(.label)).autocorrectionDisabled(keyboard == .emailAddress).textInputAutocapitalization(keyboard == .emailAddress ? .never : .sentences)
             }
         }
         .padding(.vertical, 4)
@@ -444,14 +318,13 @@ public struct CreateOrderView: View {
 
     private func submitOrder() {
         guard let weight = Double(weightString), weight > 0 else { return }
-        let packages = Int(packagesString)
-
+        
         let payload = OrderCreatePayload(
             customerName: customerName,
             customerPhone: customerPhone.isEmpty ? nil : customerPhone,
             customerEmail: customerEmail.isEmpty ? nil : customerEmail,
             totalWeightKg: weight,
-            totalPackages: packages,
+            totalPackages: Int(packagesString),
             cargoType: selectedCargoType.rawValue,
             priority: selectedPriority.rawValue,
             originName: originName,
@@ -467,8 +340,47 @@ public struct CreateOrderView: View {
         )
 
         Task {
-            let success = await viewModel.createOrder(payload: payload)
+            let success = await viewModel.createOrder(
+                payload: payload,
+                driverId: assignmentPref == .now ? selectedDriverId : nil,
+                vehicleId: assignmentPref == .now ? selectedVehicleId : nil
+            )
             if success { dismiss() }
+        }
+    }
+}
+
+// Reusable Live Resource Picker Sheet
+struct ResourcePickerSheet: View {
+    let title: String
+    let icon: String
+    let items: [(id: String, name: String)]
+    var onSelect: (String, String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if items.isEmpty {
+                    ContentUnavailableView("No Resources Found", systemImage: "exclamationmark.triangle", description: Text("Ensure you have active entities in the database."))
+                } else {
+                    ForEach(items, id: \.id) { item in
+                        Button {
+                            onSelect(item.id, item.name)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 16) {
+                                Image(systemName: icon).foregroundColor(FMSTheme.textTertiary).font(.title2)
+                                Text(item.name).font(.system(size: 16, weight: .medium)).foregroundColor(FMSTheme.textPrimary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() } } }
         }
     }
 }
