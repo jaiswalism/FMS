@@ -41,16 +41,16 @@ public struct DriversView: View {
       .scrollDismissesKeyboard(.interactively)
       .background(Color(.systemGroupedBackground).ignoresSafeArea())
       .overlay {
-          if vm.isLoading && vm.drivers.isEmpty {
-              ProgressView("Loading workforce...")
-                  .tint(FMSTheme.amber)
-          }
+        if vm.isLoading && vm.drivers.isEmpty {
+          ProgressView("Loading workforce...")
+            .tint(FMSTheme.amber)
+        }
       }
       .refreshable {
-          await vm.fetchData()
+        await vm.fetchData()
       }
       .task {
-          await vm.fetchData()
+        await vm.fetchData()
       }
       .alert(
         "Failed to load drivers",
@@ -69,9 +69,9 @@ public struct DriversView: View {
       .toolbar { toolbarContent }
       .sheet(isPresented: $showingAddDriver) {
         AddDriverView(onDriverAdded: {
-            Task { await vm.fetchData() }
+          Task { await vm.fetchData() }
         })
-          .presentationDetents([.large])
+        .presentationDetents([.large])
       }
     }
   }
@@ -104,7 +104,12 @@ public struct DriversView: View {
 /// Dense amber card matching the dashboard's fleet-status hero card.
 private struct DriversSummaryHeader: View {
 
+  @Environment(\.colorScheme) private var colorScheme
   let vm: DriversViewModel
+
+  private var summaryTextColor: Color {
+    colorScheme == .light ? .black : Color(.systemBackground)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -150,15 +155,15 @@ private struct DriversSummaryHeader: View {
         VStack(alignment: .leading, spacing: 6) {
           Text("WORKFORCE")
             .font(.caption.weight(.bold))
-            .foregroundStyle(Color(.systemBackground).opacity(0.7))
+            .foregroundStyle(summaryTextColor.opacity(0.7))
 
           Text("\(vm.onDutyCount) Active")
-            .font(.system(size: 34, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color(.systemBackground))
+            .font(.system(size: 34, weight: .semibold, design: .rounded))
+            .foregroundStyle(summaryTextColor)
 
           Text("Drivers on duty right now")
             .font(.subheadline)
-            .foregroundStyle(Color(.systemBackground).opacity(0.75))
+            .foregroundStyle(summaryTextColor.opacity(0.75))
 
           // Stat pills
           HStack(spacing: 8) {
@@ -185,9 +190,14 @@ private struct DriversSummaryHeader: View {
 // MARK: - Stat Pill
 
 private struct StatPill: View {
+  @Environment(\.colorScheme) private var colorScheme
   let label: String
   let count: Int
   let icon: String
+
+  private var pillTextColor: Color {
+    colorScheme == .light ? .black : Color(.systemBackground)
+  }
 
   var body: some View {
     HStack(spacing: 4) {
@@ -196,7 +206,7 @@ private struct StatPill: View {
       Text("\(count) \(label)")
         .font(.caption.weight(.semibold))
     }
-    .foregroundStyle(Color(.systemBackground).opacity(0.85))
+    .foregroundStyle(pillTextColor.opacity(0.85))
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
     .background(Color(.systemBackground).opacity(0.18))
@@ -220,7 +230,10 @@ private struct DirectoryTabContent: View {
           .padding(.top, 60)
       } else {
         ForEach(vm.filteredDrivers) { driver in
-          NavigationLink(destination: DriverDetailView(driver: driver)) {
+          NavigationLink(
+            destination: DriverDetailView(
+              driver: driver, onDeleted: { Task { await vm.fetchData() } })
+          ) {
             DriverCardView(driver: driver, onCall: nil)
               .padding(.horizontal, 16)
               .padding(.vertical, 5)

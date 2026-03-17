@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Supabase
 
 // MARK: - DriverDetailViewModel
 
@@ -12,11 +13,19 @@ import Observation
 @Observable
 public final class DriverDetailViewModel {
 
+  // MARK: - Identity
+  public var driverId: String
+
   // MARK: - Data
   public var driverName: String
   public var employeeID: String
   public var phone: String?
   public var availabilityStatus: DriverAvailabilityStatus
+
+  // MARK: - Deletion State
+  public var isDeleting: Bool = false
+  public var deleteError: String? = nil
+  public var deleteSuccess: Bool = false
 
   /// Assigned vehicle (from Vehicle model).
   public var vehicle: Vehicle?
@@ -94,6 +103,37 @@ public final class DriverDetailViewModel {
     currentTrip?.status?.capitalized ?? "No active trip"
   }
 
+  // MARK: - Computed: Active Trip Guard
+
+  /// True if the driver is currently on an active or in-transit trip.
+  public var hasActiveTrip: Bool {
+    guard let trip = currentTrip else { return false }
+    return trip.status == "in_transit" || trip.status == "active"
+  }
+
+  // MARK: - Delete
+
+  /// Soft-deletes the driver by setting status = "inactive" on the users table.
+  @MainActor
+  public func deleteDriver() async {
+    guard !hasActiveTrip else {
+      deleteError = "Driver cannot be deleted while assigned to active trips."
+      return
+    }
+    isDeleting = true
+    defer { isDeleting = false }
+    do {
+      try await SupabaseService.shared.client
+        .from("users")
+        .update(["status": "inactive"])
+        .eq("id", value: driverId)
+        .execute()
+      deleteSuccess = true
+    } catch {
+      deleteError = error.localizedDescription
+    }
+  }
+
   // MARK: - Init
 
   /// Production initializer accepting real related models from caller/service.
@@ -105,6 +145,7 @@ public final class DriverDetailViewModel {
     breakLogs: [BreakLog] = [],
     incidents: [Incident] = []
   ) {
+    self.driverId = driver.id
     self.driverName = driver.name
     self.employeeID = driver.employeeID
     self.phone = driver.phone

@@ -15,10 +15,15 @@ import SwiftUI
 struct DriverDetailView: View {
 
   @State private var vm: DriverDetailViewModel
+  @Environment(\.dismiss) private var dismiss
+  var onDeleted: (() -> Void)?
 
-  init(driver: DriverDisplayItem) {
+  @State private var showDeleteConfirm = false
+
+  init(driver: DriverDisplayItem, onDeleted: (() -> Void)? = nil) {
     // TODO: In production, pass real vehicle/assignment/trip/logs from parent or repository
     _vm = State(initialValue: DriverDetailViewModel.mock(from: driver))
+    self.onDeleted = onDeleted
   }
 
   var body: some View {
@@ -37,6 +42,71 @@ struct DriverDetailView: View {
     .background(FMSTheme.backgroundPrimary)
     .navigationTitle(vm.driverName)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Menu {
+          Button {
+            // TODO: Navigate to Edit Driver screen
+          } label: {
+            Label("Edit Driver", systemImage: "pencil")
+          }
+
+          Button {
+            // TODO: Implement disable driver logic
+          } label: {
+            Label("Disable Driver", systemImage: "person.slash")
+          }
+
+          Divider()
+
+          Button(role: .destructive) {
+            showDeleteConfirm = true
+          } label: {
+            Label("Delete Driver", systemImage: "trash")
+          }
+        } label: {
+          Image(systemName: "ellipsis.circle")
+            .fontWeight(.medium)
+        }
+        .disabled(vm.isDeleting)
+      }
+    }
+    .confirmationDialog(
+      "Delete Driver",
+      isPresented: $showDeleteConfirm,
+      titleVisibility: .visible
+    ) {
+      Button("Delete", role: .destructive) {
+        Task { await vm.deleteDriver() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("Are you sure you want to delete this driver? This action cannot be undone.")
+    }
+    .alert(
+      "Error",
+      isPresented: Binding(
+        get: { vm.deleteError != nil },
+        set: { if !$0 { vm.deleteError = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(vm.deleteError ?? "")
+    }
+    .overlay {
+      if vm.isDeleting {
+        Color.black.opacity(0.25).ignoresSafeArea()
+        ProgressView("Deleting...")
+          .padding(20)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+      }
+    }
+    .onChange(of: vm.deleteSuccess) { _, success in
+      guard success else { return }
+      onDeleted?()
+      dismiss()
+    }
   }
 
   // MARK: - Section 1: Driver Profile
@@ -286,3 +356,4 @@ private struct InfoLabel: View {
     }
   }
 }
+
