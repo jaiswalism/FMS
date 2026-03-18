@@ -71,8 +71,11 @@ struct EditDriverView: View {
     }
     .onChange(of: vm.saveSuccess) { _, success in
       guard success else { return }
-      onDriverUpdated?(vm.name, vm.phone.isEmpty ? nil : vm.phone)
+      let trimmedName = vm.name.trimmingCharacters(in: .whitespacesAndNewlines)
+      let trimmedPhone = vm.phone.trimmingCharacters(in: .whitespacesAndNewlines)
+      onDriverUpdated?(trimmedName, trimmedPhone.isEmpty ? nil : trimmedPhone)
       dismiss()
+    }
     }
   }
 
