@@ -19,38 +19,22 @@ public struct DriversView: View {
             .padding(.top, 4)
             .padding(.bottom, 12)
 
-          // Picker
-          Picker("", selection: $vm.selectedTab) {
-            ForEach(DriversTab.allCases, id: \.self) { tab in
-              Text(tab.rawValue).tag(tab)
-            }
-          }
-          .pickerStyle(.segmented)
-          .padding(.horizontal, 16)
-          .padding(.bottom, 12)
-
-          // Tab content
-          switch vm.selectedTab {
-          case .directory:
-            DirectoryTabContent(vm: vm)
-          case .shifts:
-            ShiftsTabContent(vm: vm)
-          }
+          DirectoryTabContent(vm: vm)
         }
       }
       .scrollDismissesKeyboard(.interactively)
       .background(Color(.systemGroupedBackground).ignoresSafeArea())
       .overlay {
-          if vm.isLoading && vm.drivers.isEmpty {
-              ProgressView("Loading workforce...")
-                  .tint(FMSTheme.amber)
-          }
+        if vm.isLoading && vm.drivers.isEmpty {
+          ProgressView("Loading workforce...")
+            .tint(FMSTheme.amber)
+        }
       }
       .refreshable {
-          await vm.fetchData()
+        await vm.fetchData()
       }
       .task {
-          await vm.fetchData()
+        await vm.fetchData()
       }
       .alert(
         "Failed to load drivers",
@@ -69,9 +53,9 @@ public struct DriversView: View {
       .toolbar { toolbarContent }
       .sheet(isPresented: $showingAddDriver) {
         AddDriverView(onDriverAdded: {
-            Task { await vm.fetchData() }
+          Task { await vm.fetchData() }
         })
-          .presentationDetents([.large])
+        .presentationDetents([.large])
       }
     }
   }
@@ -88,14 +72,6 @@ public struct DriversView: View {
           .fontWeight(.medium)
       }
     }
-    if vm.selectedTab == .shifts {
-      ToolbarItem(placement: .navigationBarTrailing) {
-        NavigationLink(destination: ShiftAssignmentView()) {
-          Image(systemName: "calendar.badge.plus")
-            .fontWeight(.medium)
-        }
-      }
-    }
   }
 }
 
@@ -104,7 +80,12 @@ public struct DriversView: View {
 /// Dense amber card matching the dashboard's fleet-status hero card.
 private struct DriversSummaryHeader: View {
 
+  @Environment(\.colorScheme) private var colorScheme
   let vm: DriversViewModel
+
+  private var summaryTextColor: Color {
+    colorScheme == .light ? .black : Color(.systemBackground)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -150,15 +131,15 @@ private struct DriversSummaryHeader: View {
         VStack(alignment: .leading, spacing: 6) {
           Text("WORKFORCE")
             .font(.caption.weight(.bold))
-            .foregroundStyle(Color(.systemBackground).opacity(0.7))
+            .foregroundStyle(summaryTextColor.opacity(0.7))
 
           Text("\(vm.onDutyCount) Active")
-            .font(.system(size: 34, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color(.systemBackground))
+            .font(.system(size: 34, weight: .semibold, design: .rounded))
+            .foregroundStyle(summaryTextColor)
 
           Text("Drivers on duty right now")
             .font(.subheadline)
-            .foregroundStyle(Color(.systemBackground).opacity(0.75))
+            .foregroundStyle(summaryTextColor.opacity(0.75))
 
           // Stat pills
           HStack(spacing: 8) {
@@ -185,9 +166,14 @@ private struct DriversSummaryHeader: View {
 // MARK: - Stat Pill
 
 private struct StatPill: View {
+  @Environment(\.colorScheme) private var colorScheme
   let label: String
   let count: Int
   let icon: String
+
+  private var pillTextColor: Color {
+    colorScheme == .light ? .black : Color(.systemBackground)
+  }
 
   var body: some View {
     HStack(spacing: 4) {
@@ -196,7 +182,7 @@ private struct StatPill: View {
       Text("\(count) \(label)")
         .font(.caption.weight(.semibold))
     }
-    .foregroundStyle(Color(.systemBackground).opacity(0.85))
+    .foregroundStyle(pillTextColor.opacity(0.85))
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
     .background(Color(.systemBackground).opacity(0.18))
@@ -220,7 +206,10 @@ private struct DirectoryTabContent: View {
           .padding(.top, 60)
       } else {
         ForEach(vm.filteredDrivers) { driver in
-          NavigationLink(destination: DriverDetailView(driver: driver)) {
+          NavigationLink(
+            destination: DriverDetailView(
+              driver: driver, onDeleted: { Task { await vm.fetchData() } })
+          ) {
             DriverCardView(driver: driver, onCall: nil)
               .padding(.horizontal, 16)
               .padding(.vertical, 5)
@@ -253,46 +242,6 @@ private struct DirectoryTabContent: View {
   }
 }
 
-// MARK: - Shifts Content
-
-private struct ShiftsTabContent: View {
-  @Bindable var vm: DriversViewModel
-
-  var body: some View {
-    LazyVStack(spacing: 0) {
-      dayStrip
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
-
-      if vm.shiftsForDate.isEmpty {
-        EmptyStateView(icon: "calendar.badge.minus", message: "No shifts scheduled")
-          .padding(.top, 60)
-      } else {
-        ForEach(vm.shiftsForDate) { shift in
-          NavigationLink(destination: DriverShiftDetailView(shift: shift)) {
-            DriverShiftCardView(shift: shift, onTrack: nil)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 5)
-          }
-          .buttonStyle(.plain)
-        }
-      }
-    }
-    .padding(.bottom, 32)
-  }
-
-  private var dayStrip: some View {
-    HStack(spacing: 6) {
-      ForEach(vm.weekDays, id: \.self) { day in
-        DayCell(
-          date: day,
-          isSelected: Calendar.current.isDate(day, inSameDayAs: vm.selectedDate)
-        ) { vm.selectedDate = day }
-      }
-    }
-  }
-}
-
 // MARK: - Filter Chip
 
 private struct FilterChip: View {
@@ -319,7 +268,7 @@ private struct FilterChip: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 8)
-      .foregroundStyle(isSelected ? .white : Color(.label))
+      .foregroundStyle(isSelected ? .black : Color(.label))
       .background {
         if isSelected {
           Capsule().fill(FMSTheme.amber)
@@ -334,53 +283,6 @@ private struct FilterChip: View {
       }
     }
     .animation(.easeInOut(duration: 0.18), value: isSelected)
-  }
-}
-
-// MARK: - Day Cell
-
-private struct DayCell: View {
-  let date: Date
-  let isSelected: Bool
-  let action: () -> Void
-  private static let weekdayFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateFormat = "EEE"
-    return f
-  }()
-
-  private static let dayFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateFormat = "d"
-    return f
-  }()
-  var body: some View {
-    Button(action: action) {
-      VStack(spacing: 3) {
-        Text(abbrev)
-          .font(.caption2.weight(.semibold))
-          .foregroundStyle(isSelected ? .white : Color(.secondaryLabel))
-        Text(number)
-          .font(.system(size: 16, weight: isSelected ? .bold : .regular, design: .rounded))
-          .foregroundStyle(isSelected ? .white : Color(.label))
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 8)
-      .background {
-        if isSelected {
-          RoundedRectangle(cornerRadius: 10, style: .continuous).fill(FMSTheme.amber)
-        }
-      }
-    }
-    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isSelected)
-  }
-
-  private var abbrev: String {
-    Self.weekdayFormatter.string(from: date).uppercased()
-  }
-
-  private var number: String {
-    Self.dayFormatter.string(from: date)
   }
 }
 

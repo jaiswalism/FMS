@@ -163,6 +163,7 @@ final class ManagerProfileViewModel {
                 .from("users")
                 .select("id")
                 .eq("role", value: "driver")
+                .eq("is_deleted", value: false)
                 .execute()
                 .value
 

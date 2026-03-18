@@ -7,6 +7,7 @@ public struct User: Codable, Identifiable {
     public var phone: String?
     public var role: String
     public var status: String?
+    public var isDeleted: Bool?
     public var licenseNumber: String?
     public var licenseExpiry: Date?
     public var createdBy: String?
@@ -21,6 +22,7 @@ public struct User: Codable, Identifiable {
         case phone
         case role
         case status
+        case isDeleted = "is_deleted"
         case licenseNumber = "license_number"
         case licenseExpiry = "license_expiry"
         case createdBy = "created_by"

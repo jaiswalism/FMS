@@ -15,10 +15,15 @@ import SwiftUI
 struct DriverDetailView: View {
 
   @State private var vm: DriverDetailViewModel
+  @Environment(\.dismiss) private var dismiss
+  var onDeleted: (() -> Void)?
 
-  init(driver: DriverDisplayItem) {
-    // TODO: In production, pass real vehicle/assignment/trip/logs from parent or repository
-    _vm = State(initialValue: DriverDetailViewModel.mock(from: driver))
+  @State private var showDeleteConfirm = false
+  @State private var showEditDriver = false
+
+  init(driver: DriverDisplayItem, onDeleted: (() -> Void)? = nil) {
+    _vm = State(initialValue: DriverDetailViewModel(driver: driver))
+    self.onDeleted = onDeleted
   }
 
   var body: some View {
@@ -37,6 +42,83 @@ struct DriverDetailView: View {
     .background(FMSTheme.backgroundPrimary)
     .navigationTitle(vm.driverName)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Menu {
+          Button {
+            showEditDriver = true
+          } label: {
+            Label("Edit Driver", systemImage: "pencil")
+          }
+
+          Button {
+            // Suspend flow not implemented yet.
+          } label: {
+            Label("Disable Driver", systemImage: "person.slash")
+          }
+          .disabled(true)
+
+          Divider()
+
+          Button(role: .destructive) {
+            showDeleteConfirm = true
+          } label: {
+            Label("Delete Driver", systemImage: "trash")
+          }
+        } label: {
+          Image(systemName: "ellipsis.circle")
+            .fontWeight(.medium)
+        }
+        .disabled(vm.isDeleting)
+      }
+    }
+    .alert(
+      "Delete Driver",
+      isPresented: $showDeleteConfirm
+    ) {
+      Button("Delete", role: .destructive) {
+        Task { await vm.deleteDriver() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("Are you sure you want to delete this driver? This action cannot be undone.")
+    }
+    .alert(
+      "Error",
+      isPresented: Binding(
+        get: { vm.deleteError != nil },
+        set: { if !$0 { vm.deleteError = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(vm.deleteError ?? "")
+    }
+    .overlay {
+      if vm.isDeleting {
+        Color.black.opacity(0.25).ignoresSafeArea()
+        ProgressView("Deleting...")
+          .padding(20)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+      }
+    }
+    .onChange(of: vm.deleteSuccess) { _, success in
+      guard success else { return }
+      onDeleted?()
+      dismiss()
+    }
+    .sheet(isPresented: $showEditDriver) {
+      EditDriverView(
+        driverId: vm.driverId,
+        name: vm.driverName,
+        phone: vm.phone,
+        onDriverUpdated: { name, phone in
+          vm.applyEdit(name: name, phone: phone)
+          onDeleted?()  // reuse parent refresh callback to sync the list
+        }
+      )
+      .presentationDetents([.large])
+    }
   }
 
   // MARK: - Section 1: Driver Profile

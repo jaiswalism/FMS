@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Supabase
 
 // MARK: - DriverDetailViewModel
 
@@ -12,11 +13,22 @@ import Observation
 @Observable
 public final class DriverDetailViewModel {
 
+  // MARK: - Identity
+  public var driverId: String
+
   // MARK: - Data
   public var driverName: String
   public var employeeID: String
   public var phone: String?
   public var availabilityStatus: DriverAvailabilityStatus
+
+  // MARK: - Edit State
+  public var email: String? = nil
+
+  // MARK: - Deletion State
+  public var isDeleting: Bool = false
+  public var deleteError: String? = nil
+  public var deleteSuccess: Bool = false
 
   /// Assigned vehicle (from Vehicle model).
   public var vehicle: Vehicle?
@@ -94,6 +106,70 @@ public final class DriverDetailViewModel {
     currentTrip?.status?.capitalized ?? "No active trip"
   }
 
+  // MARK: - Edit
+
+  /// Updates the locally-displayed driver fields after a successful edit.
+  public func applyEdit(name: String, phone: String?) {
+    self.driverName = name
+    self.phone = phone
+  }
+
+  // MARK: - Computed: Active Trip Guard
+
+  /// True if the driver is currently on an active or in-transit trip.
+  public var hasActiveTrip: Bool {
+    guard let trip = currentTrip else { return false }
+    return trip.status == "in_transit" || trip.status == "active"
+  }
+
+  // MARK: - Delete
+
+  /// Soft-deletes the driver by setting is_deleted = true on the users table.
+  ///
+  /// Performs a server-side active-trip check before deleting to prevent race
+  /// conditions where the local `currentTrip` snapshot may be stale.
+  @MainActor
+  public func deleteDriver() async {
+    // Fast-path: client-side guard (avoids a network round-trip in the common case).
+    guard !hasActiveTrip else {
+      deleteError = "Driver cannot be deleted while assigned to active trips."
+      return
+    }
+    isDeleting = true
+    do {
+      // Server-side authoritative check — catches races where a trip was
+      // assigned after this screen loaded.
+      struct ActiveTripRow: Decodable { let id: String }
+      let activeTrips: [ActiveTripRow] = try await SupabaseService.shared.client
+        .from("trips")
+        .select("id")
+        .eq("driver_id", value: driverId)
+        .in("status", values: ["active", "in_transit"])
+        .execute()
+        .value
+
+      guard activeTrips.isEmpty else {
+        deleteError = "Driver cannot be deleted while assigned to active trips."
+        isDeleting = false
+        return
+      }
+
+      struct UpdatePayload: Encodable {
+        let is_deleted: Bool
+      }
+      try await SupabaseService.shared.client
+        .from("users")
+        .update(UpdatePayload(is_deleted: true))
+        .eq("id", value: driverId)
+        .eq("is_deleted", value: false)
+        .execute()
+      deleteSuccess = true
+    } catch {
+      deleteError = error.localizedDescription
+    }
+    isDeleting = false
+  }
+
   // MARK: - Init
 
   /// Production initializer accepting real related models from caller/service.
@@ -105,9 +181,11 @@ public final class DriverDetailViewModel {
     breakLogs: [BreakLog] = [],
     incidents: [Incident] = []
   ) {
+    self.driverId = driver.id
     self.driverName = driver.name
     self.employeeID = driver.employeeID
     self.phone = driver.phone
+    self.email = nil
     self.availabilityStatus = driver.availabilityStatus
     self.vehicle = vehicle
     self.assignment = assignment

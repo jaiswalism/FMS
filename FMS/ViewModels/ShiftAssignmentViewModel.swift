@@ -95,6 +95,7 @@ public final class ShiftAssignmentViewModel {
               .from("users")
               .select()
               .eq("role", value: "driver")
+              .eq("is_deleted", value: false)
               .execute()
               
           async let vehiclesResponse = try SupabaseService.shared.client
