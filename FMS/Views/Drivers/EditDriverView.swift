@@ -76,7 +76,6 @@ struct EditDriverView: View {
       onDriverUpdated?(trimmedName, trimmedPhone.isEmpty ? nil : trimmedPhone)
       dismiss()
     }
-    }
   }
 
   // MARK: - Nav Bar
