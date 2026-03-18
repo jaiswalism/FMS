@@ -19,6 +19,7 @@ struct DriverDetailView: View {
   var onDeleted: (() -> Void)?
 
   @State private var showDeleteConfirm = false
+  @State private var showEditDriver = false
 
   init(driver: DriverDisplayItem, onDeleted: (() -> Void)? = nil) {
     // TODO: In production, pass real vehicle/assignment/trip/logs from parent or repository
@@ -46,7 +47,7 @@ struct DriverDetailView: View {
       ToolbarItem(placement: .navigationBarTrailing) {
         Menu {
           Button {
-            // TODO: Navigate to Edit Driver screen
+            showEditDriver = true
           } label: {
             Label("Edit Driver", systemImage: "pencil")
           }
@@ -106,6 +107,18 @@ struct DriverDetailView: View {
       guard success else { return }
       onDeleted?()
       dismiss()
+    }
+    .sheet(isPresented: $showEditDriver) {
+      EditDriverView(
+        driverId: vm.driverId,
+        name: vm.driverName,
+        phone: vm.phone,
+        onDriverUpdated: { name, phone in
+          vm.applyEdit(name: name, phone: phone)
+          onDeleted?()  // reuse parent refresh callback to sync the list
+        }
+      )
+      .presentationDetents([.large])
     }
   }
 
@@ -356,4 +369,3 @@ private struct InfoLabel: View {
     }
   }
 }
-

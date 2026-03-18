@@ -22,6 +22,9 @@ public final class DriverDetailViewModel {
   public var phone: String?
   public var availabilityStatus: DriverAvailabilityStatus
 
+  // MARK: - Edit State
+  public var email: String? = nil
+
   // MARK: - Deletion State
   public var isDeleting: Bool = false
   public var deleteError: String? = nil
@@ -103,6 +106,14 @@ public final class DriverDetailViewModel {
     currentTrip?.status?.capitalized ?? "No active trip"
   }
 
+  // MARK: - Edit
+
+  /// Updates the locally-displayed driver fields after a successful edit.
+  public func applyEdit(name: String, phone: String?) {
+    self.driverName = name
+    if let phone { self.phone = phone }
+  }
+
   // MARK: - Computed: Active Trip Guard
 
   /// True if the driver is currently on an active or in-transit trip.
@@ -113,7 +124,7 @@ public final class DriverDetailViewModel {
 
   // MARK: - Delete
 
-  /// Soft-deletes the driver by setting status = "inactive" on the users table.
+  /// Soft-deletes the driver by setting is_deleted = true on the users table.
   @MainActor
   public func deleteDriver() async {
     guard !hasActiveTrip else {
@@ -121,17 +132,20 @@ public final class DriverDetailViewModel {
       return
     }
     isDeleting = true
-    defer { isDeleting = false }
     do {
+      struct UpdatePayload: Encodable {
+        let is_deleted: Bool
+      }
       try await SupabaseService.shared.client
         .from("users")
-        .update(["status": "inactive"])
+        .update(UpdatePayload(is_deleted: true))
         .eq("id", value: driverId)
         .execute()
       deleteSuccess = true
     } catch {
       deleteError = error.localizedDescription
     }
+    isDeleting = false
   }
 
   // MARK: - Init
@@ -149,6 +163,7 @@ public final class DriverDetailViewModel {
     self.driverName = driver.name
     self.employeeID = driver.employeeID
     self.phone = driver.phone
+    self.email = nil
     self.availabilityStatus = driver.availabilityStatus
     self.vehicle = vehicle
     self.assignment = assignment

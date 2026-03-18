@@ -40,6 +40,7 @@ public final class SupabaseDriversDataSource: DriversDataSource {
             .from("users")
             .select()
             .eq("role", value: "driver")
+            .eq("is_deleted", value: false)
             .execute()
         let drivers = try decoder.decode([User].self, from: driversResponse.data)
         
@@ -60,18 +61,19 @@ public final class SupabaseDriversDataSource: DriversDataSource {
             .execute()
         let vehicles = try decoder.decode([Vehicle].self, from: vehiclesResponse.data)
             
-        // Fetch active trips
+        // Fetch driver-side trip activity and derive status dynamically from it.
         let tripsResponse = try await client
             .from("trips")
             .select()
-            .eq("status", value: "active")
+            .in("status", values: ["active", "in_transit"])
             .execute()
         let trips = try decoder.decode([Trip].self, from: tripsResponse.data)
             
         return drivers.map { driver in
             let assignment = assignments.first { $0.driverId == driver.id }
-            let vehicle = vehicles.first { $0.id == assignment?.vehicleId }
             let activeTrip = trips.first { $0.driverId == driver.id }
+            let assignmentVehicle = vehicles.first { $0.id == assignment?.vehicleId }
+            let tripVehicle = vehicles.first { $0.id == activeTrip?.vehicleId }
             
             // Determine availability status
             var availability: DriverAvailabilityStatus = .offDuty
@@ -80,81 +82,26 @@ public final class SupabaseDriversDataSource: DriversDataSource {
             } else if assignment != nil {
                 availability = .available
             }
+
+            // Only expose assigned vehicle for on-trip drivers.
+            let visibleVehicle: Vehicle? = {
+                guard availability == .onTrip else { return nil }
+                return tripVehicle ?? assignmentVehicle
+            }()
             
             return DriverDisplayItem(
                 id: driver.id,
                 name: driver.name,
                 employeeID: driver.employeeId ?? "#DRV-XXXX",
                 phone: driver.phone,
-                vehicleId: vehicle?.id,
-                vehicleManufacturer: vehicle?.manufacturer,
-                vehicleModel: vehicle?.model,
-                plateNumber: vehicle?.plateNumber,
+                vehicleId: visibleVehicle?.id,
+                vehicleManufacturer: visibleVehicle?.manufacturer,
+                vehicleModel: visibleVehicle?.model,
+                plateNumber: visibleVehicle?.plateNumber,
                 availabilityStatus: availability,
-                shiftStart: assignment?.shiftStart,
+                shiftStart: activeTrip?.startTime ?? assignment?.shiftStart,
                 shiftEnd: assignment?.shiftEnd,
                 activeTripId: activeTrip?.id
-            )
-        }
-    }
-    
-    public func fetchShifts() async throws -> [ShiftDisplayItem] {
-        let decoder = supabaseDecoder
-        
-        // Fetch all assignments
-        let assignmentsResponse = try await client
-            .from("driver_vehicle_assignments")
-            .select()
-            .execute()
-        let assignments = try decoder.decode([DriverVehicleAssignment].self, from: assignmentsResponse.data)
-            
-        let driversResponse = try await client
-            .from("users")
-            .select()
-            .eq("role", value: "driver")
-            .execute()
-        let drivers = try decoder.decode([User].self, from: driversResponse.data)
-            
-        let vehiclesResponse = try await client
-            .from("vehicles")
-            .select()
-            .execute()
-        let vehicles = try decoder.decode([Vehicle].self, from: vehiclesResponse.data)
-            
-        return assignments.compactMap { assignment in
-            guard let driverId = assignment.driverId,
-                  let driver = drivers.first(where: { $0.id == driverId }) else { return nil }
-            
-            let vehicle = vehicles.first(where: { $0.id == assignment.vehicleId })
-            
-            // Map DB status to display status
-            // DB: scheduled, completed, cancelled
-            // UI: on_duty, break, not_started
-            let status: String
-            switch assignment.status {
-            case "scheduled":
-                if let start = assignment.shiftStart, Date() >= start {
-                    status = "on_duty"
-                } else {
-                    status = "not_started"
-                }
-            case "completed", "cancelled":
-                return nil
-            default:
-                status = "not_started"
-            }
-            
-            return ShiftDisplayItem(
-                id: assignment.id,
-                driverId: driver.id,
-                driverName: driver.name,
-                vehicleId: vehicle?.id,
-                vehicleManufacturer: vehicle?.manufacturer,
-                vehicleModel: vehicle?.model,
-                plateNumber: vehicle?.plateNumber,
-                shiftStart: assignment.shiftStart,
-                shiftEnd: assignment.shiftEnd,
-                status: status
             )
         }
     }

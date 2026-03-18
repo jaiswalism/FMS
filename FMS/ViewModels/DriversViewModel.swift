@@ -1,88 +1,12 @@
 import Foundation
 import Observation
 
-// MARK: - Drivers Tab Selection
-
-/// Identifies which sub-tab is active in the Drivers screen.
-public enum DriversTab: String, CaseIterable {
-  case directory = "Directory"
-  case shifts = "Shifts"
-}
-
-// MARK: - Shift Display Item
-
-/// Lightweight display wrapper for a shift card, assembled from
-/// `DriverVehicleAssignment` + `Driver` + `Vehicle`.
-public struct ShiftDisplayItem: Identifiable, Hashable {
-  public var id: String
-  public var driverId: String
-  public var driverName: String
-  public var vehicleId: String?
-  public var vehicleManufacturer: String?
-  public var vehicleModel: String?
-  public var plateNumber: String?
-  public var shiftStart: Date?
-  public var shiftEnd: Date?
-  public var status: String  // "on_duty", "break", "not_started"
-
-  /// Human-readable status label.
-  public var statusLabel: String {
-    switch status {
-    case "on_duty": return "On Duty"
-    case "break": return "Break"
-    case "not_started": return "Not Started"
-    default: return status.capitalized
-    }
-  }
-
-  /// Shift duration in hours.
-  public var shiftDurationHours: Double {
-    guard let s = shiftStart, let e = shiftEnd else { return 8 }
-    return max(0, e.timeIntervalSince(s) / 3600)
-  }
-
-  /// Hours elapsed (capped).
-  public var elapsedHours: Double {
-    guard let s = shiftStart else { return 0 }
-    let elapsed = Date().timeIntervalSince(s) / 3600
-    return min(max(0, elapsed), shiftDurationHours)
-  }
-
-  /// 0.0–1.0 progress.
-  public var progress: Double {
-    guard shiftDurationHours > 0 else { return 0 }
-    return elapsedHours / shiftDurationHours
-  }
-
-  /// Formatted label, e.g. "6h 30m / 8h".
-  public var progressLabel: String {
-    let wH = Int(elapsedHours)
-    let wM = Int((elapsedHours - Double(wH)) * 60)
-    let tH = Int(shiftDurationHours)
-    return "\(wH)h \(wM)m / \(tH)h"
-  }
-
-  /// Vehicle display name.
-  public var vehicleDisplayName: String? {
-    guard let m = vehicleManufacturer, let mdl = vehicleModel else { return nil }
-    return "\(m) \(mdl)"
-  }
-
-  /// Two-letter initials.
-  public var avatarInitials: String {
-    driverName.split(separator: " ").prefix(2)
-      .compactMap { $0.first.map(String.init) }
-      .joined()
-  }
-}
-
 // MARK: - Drivers Data Source Protocol
 
-/// Protocol for providing driver and shift data to the DriversViewModel.
+/// Protocol for providing driver roster data to the DriversViewModel.
 /// Implement this protocol for real repository/service or mock data sources.
 public protocol DriversDataSource {
   func fetchDrivers() async throws -> [DriverDisplayItem]
-  func fetchShifts() async throws -> [ShiftDisplayItem]
 }
 
 // MARK: - Mock Data Source
@@ -94,32 +18,21 @@ public final class MockDriversDataSource: DriversDataSource {
   public func fetchDrivers() async throws -> [DriverDisplayItem] {
     DriversViewModel.makeMockDrivers()
   }
-
-  public func fetchShifts() async throws -> [ShiftDisplayItem] {
-    DriversViewModel.makeMockShifts()
-  }
 }
 
 // MARK: - DriversViewModel
 
 /// Central `@Observable` ViewModel for the Drivers module.
 ///
-/// Holds all list data, search/filter state, and the selected date for shifts.
+/// Holds all list data and directory state.
 /// All computation happens here — views only read and bind.
 @Observable
 public final class DriversViewModel {
-
-  // MARK: - Tab State
-  public var selectedTab: DriversTab = .directory
 
   // MARK: - Directory State
   public var drivers: [DriverDisplayItem] = []
   public var searchText: String = ""
   public var selectedFilter: DriverAvailabilityStatus? = nil
-
-  // MARK: - Shifts State
-  public var shiftItems: [ShiftDisplayItem] = []
-  public var selectedDate: Date = Date()
   
   // MARK: - UI State
   public var isLoading: Bool = false
@@ -161,39 +74,10 @@ public final class DriversViewModel {
   /// Total drivers.
   public var totalCount: Int { drivers.count }
 
-  // MARK: - Computed: Shifts
-
-  /// 6-day window for the date strip.
-  public var weekDays: [Date] {
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-    return (-1...4).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
-  }
-
-  /// Shift items for the selected date (including overnight shifts that overlap).
-  public var shiftsForDate: [ShiftDisplayItem] {
-    let cal = Calendar.current
-    guard let dayStart = cal.startOfDay(for: selectedDate) as Date?,
-      let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)
-    else {
-      return []
-    }
-
-    return
-      shiftItems
-      .filter { item in
-        let start = item.shiftStart ?? .distantPast
-        let end = item.shiftEnd ?? .distantFuture
-        // Include shift if it overlaps the selected day
-        return start < dayEnd && end > dayStart
-      }
-      .sorted { ($0.shiftStart ?? .distantPast) < ($1.shiftStart ?? .distantPast) }
-  }
-
   // MARK: - Init
 
   /// Initializer with data source dependency injection.
-  /// - Parameter dataSource: Source for drivers and shifts data. Defaults to mock for previews.
+  /// - Parameter dataSource: Source for drivers data. Defaults to mock for previews.
   /// Production code should explicitly pass a real repository/service implementation.
   public init(dataSource: DriversDataSource = MockDriversDataSource()) {
     self.dataSource = dataSource
@@ -205,13 +89,7 @@ public final class DriversViewModel {
     errorMessage = nil
     
     do {
-      async let fetchedDrivers = dataSource.fetchDrivers()
-      async let fetchedShifts = dataSource.fetchShifts()
-      
-      let (drivers, shifts) = try await (fetchedDrivers, fetchedShifts)
-      
-      self.drivers = drivers
-      self.shiftItems = shifts
+      self.drivers = try await dataSource.fetchDrivers()
     } catch {
       self.errorMessage = error.localizedDescription
       print("Error fetching drivers data: \(error)")
@@ -270,43 +148,4 @@ extension DriversViewModel {
     ]
   }
 
-  public static func makeMockShifts() -> [ShiftDisplayItem] {
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-
-    func todayAt(hour: Int, minute: Int = 0) -> Date {
-      cal.date(bySettingHour: hour, minute: minute, second: 0, of: today)!
-    }
-
-    return [
-      ShiftDisplayItem(
-        id: "shift-001", driverId: "drv-8829", driverName: "Marcus Thompson",
-        vehicleId: "v-004", vehicleManufacturer: "Volvo", vehicleModel: "FH16",
-        plateNumber: "TN11N3067",
-        shiftStart: todayAt(hour: 8), shiftEnd: todayAt(hour: 18),
-        status: "on_duty"
-      ),
-      ShiftDisplayItem(
-        id: "shift-002", driverId: "drv-9104", driverName: "Sarah Jenkins",
-        vehicleId: "v-002", vehicleManufacturer: "Scania", vehicleModel: "R500",
-        plateNumber: "XYZ-9876",
-        shiftStart: todayAt(hour: 9, minute: 30), shiftEnd: todayAt(hour: 19),
-        status: "break"
-      ),
-      ShiftDisplayItem(
-        id: "shift-003", driverId: "drv-7741", driverName: "David Lee",
-        vehicleId: "v-005", vehicleManufacturer: "Mercedes", vehicleModel: "Actros",
-        plateNumber: "DL-4432",
-        shiftStart: todayAt(hour: 14), shiftEnd: todayAt(hour: 22),
-        status: "not_started"
-      ),
-      ShiftDisplayItem(
-        id: "shift-004", driverId: "drv-8821", driverName: "Alex Thompson",
-        vehicleId: "v-001", vehicleManufacturer: "Freightliner", vehicleModel: "M2",
-        plateNumber: "FLD-829",
-        shiftStart: todayAt(hour: 7), shiftEnd: todayAt(hour: 15),
-        status: "on_duty"
-      ),
-    ]
-  }
 }

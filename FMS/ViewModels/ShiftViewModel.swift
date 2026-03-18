@@ -1,6 +1,75 @@
 import Foundation
 import Observation
 
+// MARK: - Shift Display Item
+
+/// Shift display wrapper used by shift-specific screens.
+///
+/// This remains in the shift module for compatibility, while the Fleet Manager
+/// Drivers tab no longer depends on it.
+public struct ShiftDisplayItem: Identifiable, Hashable {
+  public var id: String
+  public var driverId: String
+  public var driverName: String
+  public var vehicleId: String?
+  public var vehicleManufacturer: String?
+  public var vehicleModel: String?
+  public var plateNumber: String?
+  public var shiftStart: Date?
+  public var shiftEnd: Date?
+  public var status: String  // "on_duty", "break", "not_started"
+
+  /// Human-readable status label.
+  public var statusLabel: String {
+    switch status {
+    case "on_duty": return "On Duty"
+    case "break": return "Break"
+    case "not_started": return "Not Started"
+    default: return status.capitalized
+    }
+  }
+
+  /// Shift duration in hours.
+  public var shiftDurationHours: Double {
+    guard let s = shiftStart, let e = shiftEnd else { return 8 }
+    return max(0, e.timeIntervalSince(s) / 3600)
+  }
+
+  /// Hours elapsed (capped).
+  public var elapsedHours: Double {
+    guard let s = shiftStart else { return 0 }
+    let elapsed = Date().timeIntervalSince(s) / 3600
+    return min(max(0, elapsed), shiftDurationHours)
+  }
+
+  /// 0.0–1.0 progress.
+  public var progress: Double {
+    guard shiftDurationHours > 0 else { return 0 }
+    return elapsedHours / shiftDurationHours
+  }
+
+  /// Formatted label, e.g. "6h 30m / 8h".
+  public var progressLabel: String {
+    let wH = Int(elapsedHours)
+    let wM = Int((elapsedHours - Double(wH)) * 60)
+    let tH = Int(shiftDurationHours)
+    return "\(wH)h \(wM)m / \(tH)h"
+  }
+
+  /// Vehicle display name.
+  public var vehicleDisplayName: String? {
+    guard let m = vehicleManufacturer, let mdl = vehicleModel else { return nil }
+    return "\(m) \(mdl)"
+  }
+
+  /// Two-letter initials.
+  public var avatarInitials: String {
+    driverName.split(separator: " ").prefix(2)
+      .compactMap { $0.first.map(String.init) }
+      .joined()
+  }
+}
+
 // MARK: - Shift Timeline Entry
 
 /// A single event in the shift timeline view.

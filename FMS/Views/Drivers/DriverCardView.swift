@@ -38,11 +38,14 @@ struct DriverCardView: View {
         .font(.footnote)
         .foregroundStyle(FMSTheme.textSecondary)
 
-      if let vName = driver.vehicleDisplayName, let plate = driver.plateNumber {
+      if shouldShowAssignedVehicle,
+        let vName = driver.vehicleDisplayName,
+        let plate = driver.plateNumber
+      {
         VehicleRow(vehicleName: vName, plate: plate)
       }
 
-      if driver.shiftStart != nil {
+      if shouldShowShiftProgress {
         ShiftProgressRow(label: driver.shiftProgressLabel, progress: driver.shiftProgress)
       }
 
@@ -59,6 +62,14 @@ struct DriverCardView: View {
     case .onTrip: return FMSTheme.amber
     case .offDuty: return FMSTheme.textTertiary
     }
+  }
+
+  private var shouldShowShiftProgress: Bool {
+    driver.availabilityStatus == .onTrip
+  }
+
+  private var shouldShowAssignedVehicle: Bool {
+    driver.availabilityStatus == .onTrip
   }
 }
 
