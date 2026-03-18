@@ -67,14 +67,16 @@ struct LocationSearchSheet: View {
         isResolving = true
         let request = MKLocalSearch.Request(completion: result)
         MKLocalSearch(request: request).start { response, _ in
-            isResolving = false
-            let name = result.title + (result.subtitle.isEmpty ? "" : ", \(result.subtitle)")
-            if let coordinate = response?.mapItems.first?.placemark.coordinate {
-                onSelect(name, coordinate.latitude, coordinate.longitude)
-            } else {
-                onSelect(name, nil, nil)
+            Task { @MainActor in
+                isResolving = false
+                let name = result.title + (result.subtitle.isEmpty ? "" : ", \(result.subtitle)")
+                if let coordinate = response?.mapItems.first?.placemark.coordinate {
+                    onSelect(name, coordinate.latitude, coordinate.longitude)
+                } else {
+                    onSelect(name, nil, nil)
+                }
+                dismiss()
             }
-            dismiss()
         }
     }
 }
@@ -255,7 +257,7 @@ public struct CreateOrderView: View {
                 // Fetch resources based on the default date when the view opens
                 await viewModel.fetchAvailableResources(for: pickupDate)
             }
-            // NEW: Listen to date changes to recalculate driver availability dynamically
+            // Listen to date changes to recalculate driver availability dynamically
             .onChange(of: pickupDate) { _, newDate in
                 Task {
                     await viewModel.fetchAvailableResources(for: newDate)
@@ -271,9 +273,31 @@ public struct CreateOrderView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingOriginSearch) { LocationSearchSheet(title: "Pickup Location") { name, lat, lng in self.originName = name; self.originLat = lat; self.originLng = lng } }
-            .sheet(isPresented: $showingDestinationSearch) { LocationSearchSheet(title: "Drop-off Location") { name, lat, lng in self.destinationName = name; self.destinationLat = lat; self.destinationLng = lng } }
-            .sheet(isPresented: $showingWaypointSearch) { LocationSearchSheet(title: "Add Stop") { name, lat, lng in if let lat = lat, let lng = lng { waypoints.append(Waypoint(name: name, lat: lat, lng: lng)) } } }
+            .sheet(isPresented: $showingOriginSearch) {
+                LocationSearchSheet(title: "Pickup Location") { name, lat, lng in
+                    if let lat = lat, let lng = lng {
+                        self.originName = name
+                        self.originLat = lat
+                        self.originLng = lng
+                    }
+                }
+            }
+            .sheet(isPresented: $showingDestinationSearch) {
+                LocationSearchSheet(title: "Drop-off Location") { name, lat, lng in
+                    if let lat = lat, let lng = lng {
+                        self.destinationName = name
+                        self.destinationLat = lat
+                        self.destinationLng = lng
+                    }
+                }
+            }
+            .sheet(isPresented: $showingWaypointSearch) {
+                LocationSearchSheet(title: "Add Stop") { name, lat, lng in
+                    if let lat = lat, let lng = lng {
+                        waypoints.append(Waypoint(name: name, lat: lat, lng: lng))
+                    }
+                }
+            }
             .sheet(isPresented: $showingDriverSearch) {
                 ResourcePickerSheet(title: "Select Driver", icon: "person.circle.fill", items: viewModel.availableDrivers.map { ($0.id, $0.name) }) { id, name in
                     self.selectedDriverId = id; self.selectedDriverName = name

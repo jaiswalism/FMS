@@ -297,30 +297,35 @@ public struct OrderDetailView: View {
                 .padding(.horizontal, 16)
                 
                 // MARK: - Additional Notes
-                if let notes = order.specialInstructions, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "note.text")
-                                .foregroundColor(FMSTheme.amber)
-                            Text("Additional Notes")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(FMSTheme.textPrimary)
-                            Spacer()
-                        }
-                        
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "note.text")
+                            .foregroundColor(FMSTheme.amber)
+                        Text("Additional Notes")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(FMSTheme.textPrimary)
+                        Spacer()
+                    }
+                    
+                    if let notes = order.specialInstructions, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text(notes)
                             .font(.system(size: 15))
                             .foregroundColor(FMSTheme.textSecondary)
                             // Allows long notes to wrap naturally
                             .fixedSize(horizontal: false, vertical: true)
                             .lineSpacing(4)
+                    } else {
+                        Text("No additional notes provided.")
+                            .font(.system(size: 15))
+                            .foregroundColor(FMSTheme.textTertiary)
+                            .italic()
                     }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(FMSTheme.cardBackground)
-                    .cornerRadius(16)
-                    .padding(.horizontal, 16)
                 }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(FMSTheme.cardBackground)
+                .cornerRadius(16)
+                .padding(.horizontal, 16)
                 
                 // MARK: - Action Button
                 if order.isPending && assignmentDetails == nil {
@@ -428,7 +433,6 @@ public struct OrderDetailView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
     
-    // Updated detailRow to handle long wrapping text and custom icon colors
     @ViewBuilder
     private func detailRow(title: String, value: String, icon: String, iconColor: Color? = nil) -> some View {
         HStack(spacing: 16) {
@@ -446,7 +450,6 @@ public struct OrderDetailView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(FMSTheme.textPrimary)
                 .multilineTextAlignment(.trailing)
-                // This prevents truncation (...) and forces text onto the next line
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -543,7 +546,10 @@ struct DriverVehicleAssignmentSheet: View {
     
     @State private var selectedDriverId: String?
     @State private var selectedVehicleId: String?
+    
     @State private var isSubmitting = false
+    @State private var errorMessage: String? = nil
+    @State private var showError = false
     
     var body: some View {
         NavigationStack {
@@ -567,8 +573,19 @@ struct DriverVehicleAssignmentSheet: View {
                     if let dId = selectedDriverId, let vId = selectedVehicleId {
                         isSubmitting = true
                         Task {
-                            try? await viewModel.assignTrip(orderId: orderId, driverId: dId, vehicleId: vId)
-                            dismiss()
+                            do {
+                                try await viewModel.assignTrip(orderId: orderId, driverId: dId, vehicleId: vId)
+                                await MainActor.run {
+                                    isSubmitting = false
+                                    dismiss()
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    isSubmitting = false
+                                    errorMessage = error.localizedDescription
+                                    showError = true
+                                }
+                            }
                         }
                     }
                 }) {
@@ -590,6 +607,11 @@ struct DriverVehicleAssignmentSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .alert("Assignment Failed", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred while dispatching the trip.")
             }
             .task {
                 await viewModel.fetchAvailableResources(for: targetDate)
