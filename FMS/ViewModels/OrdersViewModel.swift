@@ -53,7 +53,7 @@ public final class OrdersViewModel {
     
     public init() {}
     
-    // MARK: - Fetch Available Resources
+    // MARK: - Fetch Available Resources (The "19th" Conflict Checker)
     // Accepts an optional Date so call sites can filter out already-busy
     // drivers and vehicles. When nil, returns all active drivers/vehicles.
     @MainActor
@@ -64,6 +64,9 @@ public final class OrdersViewModel {
                 .from("users")
                 .select("id, name")
                 .eq("role", value: "driver")
+                .eq("is_deleted", value: false)
+                .eq("employment_status", value: "active")
+                .eq("operational_status", value: "available")
                 .execute()
                 .value
             
@@ -97,7 +100,7 @@ public final class OrdersViewModel {
                 // Join trips → orders to get the pickup date
                 let busyTrips: [BusyTrip] = try await SupabaseService.shared.client
                     .from("trips")
-                    .select("driver_id, vehicle_id, orders!inner(requested_pickup_at)")
+                    .select("driver_id, vehicle_id, orders!trips_order_id_fkey!inner(requested_pickup_at)")
                     .gte("orders.requested_pickup_at", value: startStr)
                     .lt("orders.requested_pickup_at", value: endStr)
                     .neq("status", value: "cancelled")
@@ -107,6 +110,7 @@ public final class OrdersViewModel {
                 let busyDriverIds  = Set(busyTrips.compactMap(\.driver_id))
                 let busyVehicleIds = Set(busyTrips.compactMap(\.vehicle_id))
                 
+                // Filter out any driver/vehicle that is already busy that day!
                 self.availableDrivers  = allDrivers.filter  { !busyDriverIds.contains($0.id) }
                 self.availableVehicles = allVehicles.filter { !busyVehicleIds.contains($0.id) }
             } else {
@@ -161,9 +165,11 @@ public final class OrdersViewModel {
             // 2. If "Assign Now" was chosen, create the trip immediately
             if let dId = driverId, let vId = vehicleId {
                 try await assignTrip(orderId: createdOrder.id, driverId: dId, vehicleId: vId)
+            } else {
+                // Only refresh if we didn't assign (assignTrip refreshes internally)
+                await fetchOrders()
             }
             
-            await fetchOrders()
             isCreating = false
             return true
         } catch {
@@ -173,35 +179,94 @@ public final class OrdersViewModel {
         }
     }
     
-    // MARK: - Assign Trip
+    // MARK: - Assign Trip (Two-Step Database Transaction)
     @MainActor
     public func assignTrip(orderId: String, driverId: String, vehicleId: String) async throws {
+        // Step 1: Fetch the current order details to copy routing info to the Trip
+        let orders: [Order] = try await SupabaseService.shared.client
+            .from("orders")
+            .select()
+            .eq("id", value: orderId)
+            .execute()
+            .value
+        
+        guard let order = orders.first else {
+            throw NSError(domain: "OrderError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Order not found"])
+        }
+        
+        // Step 2: Prepare the new Trip record payload
         struct TripCreatePayload: Encodable {
             let order_id: String
             let driver_id: String
             let vehicle_id: String
             let status: String
+            let shipment_description: String?
+            let shipment_weight_kg: Double?
+            let shipment_package_count: Int?
+            let special_instructions: String?
+            let start_name: String?
+            let start_lat: Double?
+            let start_lng: Double?
+            let end_name: String?
+            let end_lat: Double?
+            let end_lng: Double?
         }
         
         let newTrip = TripCreatePayload(
             order_id: orderId,
             driver_id: driverId,
             vehicle_id: vehicleId,
-            status: "scheduled"
+            status: "scheduled", // Ready for the driver to start
+            shipment_description: order.cargoType,
+            shipment_weight_kg: order.totalWeightKg,
+            shipment_package_count: order.totalPackages,
+            special_instructions: order.specialInstructions,
+            start_name: order.originName,
+            start_lat: order.originLat,
+            start_lng: order.originLng,
+            end_name: order.destinationName,
+            end_lat: order.destinationLat,
+            end_lng: order.destinationLng
         )
-        try await SupabaseService.shared.client
+        
+        // Step 3: Insert the Trip into the database and return the generated record
+        struct InsertedTrip: Decodable {
+            let id: String
+        }
+        
+        let insertedTrips: [InsertedTrip] = try await SupabaseService.shared.client
             .from("trips")
             .insert(newTrip)
+            .select("id") // Ask Supabase to return the generated UUID
             .execute()
+            .value
         
-        // Mark the order as confirmed
-        struct OrderUpdate: Encodable { let status: String }
+        guard let generatedTripId = insertedTrips.first?.id else {
+            throw NSError(domain: "TripError", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to generate Trip ID"])
+        }
+        
+        // Step 4: Update the Order with the new relationships to eliminate blind spots
+        struct OrderUpdatePayload: Encodable {
+            let status: String
+            let trip_id: String
+            let assigned_driver_id: String
+            let assigned_vehicle_id: String
+        }
+        
+        let updatePayload = OrderUpdatePayload(
+            status: "dispatched",
+            trip_id: generatedTripId,
+            assigned_driver_id: driverId,
+            assigned_vehicle_id: vehicleId
+        )
+        
         try await SupabaseService.shared.client
             .from("orders")
-            .update(OrderUpdate(status: "confirmed"))
+            .update(updatePayload)
             .eq("id", value: orderId)
             .execute()
         
+        // Step 5: Refresh the local UI state
         await fetchOrders()
     }
 }

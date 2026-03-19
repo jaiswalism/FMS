@@ -41,6 +41,7 @@ public final class SupabaseDriversDataSource: DriversDataSource {
             .select()
             .eq("role", value: "driver")
             .eq("is_deleted", value: false)
+            .eq("employment_status", value: "active")
             .execute()
         let drivers = try decoder.decode([User].self, from: driversResponse.data)
         
