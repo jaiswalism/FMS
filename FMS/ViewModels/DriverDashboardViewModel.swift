@@ -51,6 +51,10 @@ public final class DriverDashboardViewModel {
     public var searchText: String = ""
     public var selectedTripFilter: TripFilterOption = .all
     public var selectedSegment: TripSegment = .upcoming
+    // issueReports holds IssueReport values (the local domain model, not DefectCreatePayload).
+    // IssueReportView reads this array indirectly via the viewModel — no view currently
+    // binds directly to issueReports, but it's observable so any future observer will
+    // react immediately when a new report is appended here after a successful insert.
     public var issueReports: [IssueReport] = []
     public var errorMessage: String? = nil
 
@@ -67,25 +71,18 @@ public final class DriverDashboardViewModel {
         let calendar = Calendar.current
         let now = Date()
 
-        // 1. Apply date filter first
         var trips = completedTrips.filter { trip in
             guard let date = trip.startTime else {
-                // trips with no startTime only appear under .all
                 return selectedTripFilter == .all
             }
             switch selectedTripFilter {
-            case .all:
-                return true
-            case .today:
-                return calendar.isDateInToday(date)
-            case .thisWeek:
-                return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
-            case .thisMonth:
-                return calendar.isDate(date, equalTo: now, toGranularity: .month)
+            case .all:       return true
+            case .today:     return calendar.isDateInToday(date)
+            case .thisWeek:  return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
+            case .thisMonth: return calendar.isDate(date, equalTo: now, toGranularity: .month)
             }
         }
 
-        // 2. Apply search text on top
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             trips = trips.filter { trip in
@@ -139,7 +136,9 @@ public final class DriverDashboardViewModel {
                 .value
 
             if let p = profiles.first {
-                let currentStatus: DriverAvailabilityStatus = (p.operational_status == "on_trip") ? .onTrip : (p.operational_status == "available" ? .available : .offDuty)
+                let currentStatus: DriverAvailabilityStatus =
+                    p.operational_status == "on_trip"  ? .onTrip  :
+                    p.operational_status == "available" ? .available : .offDuty
                 self.driver = DriverDisplayItem(
                     id: p.id,
                     name: p.name,
@@ -259,18 +258,24 @@ public final class DriverDashboardViewModel {
         }
 
         let payload = DefectCreatePayload(
-            vehicle_id: report.vehicleId,
-            reported_by: report.driverId,
-            title: "Driver Issue Report: \(report.category.rawValue)",
-            description: report.description,
-            category: report.category.rawValue.lowercased(),
-            priority: report.severity.rawValue.lowercased(),
-            status: "open"
+            vehicle_id:   report.vehicleId,
+            reported_by:  report.driverId,
+            title:        "Driver Issue Report: \(report.category.rawValue)",
+            description:  report.description,
+            category:     report.category.rawValue.lowercased(),
+            priority:     report.severity.rawValue.lowercased(),
+            status:       "open"
         )
 
         try await SupabaseService.shared.client
             .from("defects")
             .insert(payload)
             .execute()
+
+        // Append to local array immediately after a successful DB insert so any
+        // observing view reflects the new report without a full refresh.
+        // issueReports holds IssueReport (the domain model), not DefectCreatePayload,
+        // so the types remain consistent with all existing call sites.
+        self.issueReports.append(report)
     }
 }
