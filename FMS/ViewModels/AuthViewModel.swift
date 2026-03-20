@@ -101,15 +101,35 @@ public class AuthViewModel {
     }
   
     
-    public func sendPasswordReset(email: String, bannerManager: BannerManager) async {
+    public func sendPasswordReset(email: String, bannerManager: BannerManager) async -> Bool { // ✅ return Bool
+        
+        // ✅ Add email validation (mirrors login)
+        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
+            bannerManager.show(type: .error, message: "Please enter your email address.")
+            return false
+        }
+        
+        guard email.contains("@") && email.contains(".") else {
+            bannerManager.show(type: .error, message: "Please enter a valid email address.")
+            return false
+        }
+        
+        // ✅ Safe URL unwrap instead of force unwrap
+        guard let redirectURL = URL(string: "com.nirvaan.fms://reset-password") else {
+            bannerManager.show(type: .error, message: "Invalid configuration. Please contact support.")
+            return false
+        }
+        
         do {
             try await SupabaseService.shared.client.auth.resetPasswordForEmail(
                 email,
-                redirectTo: URL(string: "com.nirvaan.fms://reset-password")! 
+                redirectTo: redirectURL
             )
             bannerManager.show(type: .success, message: "Reset link sent to \(email)")
+            return true  // ✅
         } catch {
             bannerManager.show(type: .error, message: error.localizedDescription)
+            return false  // ✅
         }
     }
     

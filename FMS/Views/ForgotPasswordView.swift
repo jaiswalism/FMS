@@ -11,18 +11,18 @@ struct ForgotPasswordView: View {
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(BannerManager.self) private var bannerManager
     @Environment(\.dismiss) private var dismiss
-
+    
     @State private var email: String = ""
     @State private var isLoading: Bool = false
     @State private var isEmailSent: Bool = false
-
+    
     private var isFormValid: Bool { !email.isEmpty }
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
                 FMSTheme.backgroundPrimary.ignoresSafeArea()
-
+                
                 VStack(spacing: 24) {
                     // Icon
                     ZStack {
@@ -33,22 +33,23 @@ struct ForgotPasswordView: View {
                             .font(.system(size: 28, weight: .semibold))
                             .foregroundColor(.white)
                     }
-
+                    
                     VStack(spacing: 8) {
                         Text("Reset Password")
                             .font(.title2.bold())
                             .foregroundColor(FMSTheme.textPrimary)
-
+                        
                         Text("Enter your email and we'll send you a reset link.")
                             .font(.subheadline)
                             .foregroundColor(FMSTheme.textSecondary)
                             .multilineTextAlignment(.center)
                     }
-
+                    
                     if isEmailSent {
-                        // ✅ Success state
+                        
+                        
                         Label("Reset link sent! Check your inbox.", systemImage: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundColor(FMSTheme.amber)  // ✅ instead of .green
                             .font(.subheadline)
                     } else {
                         VStack(spacing: 16) {
@@ -61,7 +62,7 @@ struct ForgotPasswordView: View {
                                 .foregroundColor(FMSTheme.textPrimary)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
-
+                            
                             Button {
                                 sendResetEmail()
                             } label: {
@@ -82,7 +83,7 @@ struct ForgotPasswordView: View {
                             .disabled(!isFormValid || isLoading)
                         }
                     }
-
+                    
                     Spacer()
                 }
                 .padding(24)
@@ -92,22 +93,27 @@ struct ForgotPasswordView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(FMSTheme.amber)
+                    
                 }
             }
         }
     }
-
+    
+    // ✅ Use return value to conditionally set isEmailSent
     private func sendResetEmail() {
         isLoading = true
         Task {
-            await authViewModel.sendPasswordReset(
+            let success = await authViewModel.sendPasswordReset(
                 email: email,
                 bannerManager: bannerManager
             )
             await MainActor.run {
                 isLoading = false
-                isEmailSent = true
+                if success {          // ✅ only show success UI if it actually succeeded
+                    isEmailSent = true
+                }
             }
         }
+        
     }
 }
