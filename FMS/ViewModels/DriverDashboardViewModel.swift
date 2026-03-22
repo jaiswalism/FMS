@@ -58,6 +58,9 @@ public final class DriverDashboardViewModel {
     public var issueReports: [IssueReport] = []
     public var errorMessage: String? = nil
 
+    // MARK: - Break Logging
+    public var breakLogViewModel: BreakLogViewModel = BreakLogViewModel()
+
     // MARK: - Computed
     public var hasActiveTrip: Bool { activeTrip != nil }
     public var currentJob: Trip? { activeTrip ?? upcomingTrips.first }

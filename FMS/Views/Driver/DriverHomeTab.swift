@@ -11,6 +11,7 @@ struct DriverHomeTab: View {
     @State private var showProfile = false
     @State private var selectedTrip: Trip?
     @State private var showLocationConfirmation = false
+    @State private var showBreakLog = false
 
     /// Trip to start after pre-trip inspection completes
     @State private var pendingStartTrip: Trip?
@@ -56,6 +57,13 @@ struct DriverHomeTab: View {
             }
             .sheet(isPresented: $showFuelReceipt) {
                 FuelReceiptScannerEntryView(tripID: viewModel.currentJob?.id)
+            }
+            .sheet(isPresented: $showBreakLog) {
+                BreakLogView(
+                    vm: viewModel.breakLogViewModel,
+                    driverId: viewModel.driver.id,
+                    tripId: viewModel.activeTrip?.id
+                )
             }
             .sheet(isPresented: $showProfile) {
                 DriverProfileTab(viewModel: viewModel)
@@ -146,6 +154,7 @@ struct DriverHomeTab: View {
                     trip: job,
                     vehiclePlate: viewModel.assignedVehicle?.plateNumber,
                     isActive: viewModel.currentJobIsActive,
+                    isOnBreak: viewModel.breakLogViewModel.isOnBreak,
                     onStartJob: {
                         // Show pre-trip inspection first, then start trip
                         pendingStartTrip = job
@@ -157,6 +166,16 @@ struct DriverHomeTab: View {
                         // Show post-trip inspection first, then end trip
                         postTripInspectionCompleted = false
                         showPostTripInspection = true
+                    },
+                    onLogBreak: {
+                        if viewModel.breakLogViewModel.isOnBreak {
+                            // End break directly — no sheet needed
+                            Task {
+                                try? await viewModel.breakLogViewModel.endBreak()
+                            }
+                        } else {
+                            showBreakLog = true
+                        }
                     }
                 )
             } else {

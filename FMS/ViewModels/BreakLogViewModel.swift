@@ -3,6 +3,35 @@ import CoreLocation
 import Observation
 import Supabase
 
+// MARK: - Break Type
+
+public enum BreakType: String, CaseIterable, Identifiable, Codable {
+    case rest  = "rest"
+    case meal  = "meal"
+    case fuel  = "fuel"
+    case other = "other"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .rest:  return "Rest"
+        case .meal:  return "Meal"
+        case .fuel:  return "Fuel Stop"
+        case .other: return "Other"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .rest:  return "bed.double.fill"
+        case .meal:  return "fork.knife"
+        case .fuel:  return "fuelpump.fill"
+        case .other: return "ellipsis.circle.fill"
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
@@ -11,10 +40,12 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     public var isOnBreak: Bool = false
     public var selectedBreakType: BreakType = .rest
+    public var notes: String = ""
     public var currentBreakStartTime: Date?
     public var currentBreakElapsedSeconds: TimeInterval = 0
     public var breakLogs: [BreakLog] = []
     public var showMinDurationWarning: Bool = false
+    public var errorMessage: String? = nil
 
     // MARK: - Private
 
@@ -38,6 +69,15 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         setupLocationManager()
     }
 
+    // Default init for compatibility with standard declarations where values are not yet known
+    public override init() {
+        self.driverId = ""
+        self.tripId = ""
+        self.vehicleId = ""
+        super.init()
+        setupLocationManager()
+    }
+
     // MARK: - Formatted
 
     public var formattedElapsed: String {
@@ -49,7 +89,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Public API
 
-    public func startBreak() {
+    public func startBreak(driverId: String? = nil, tripId: String? = nil, lat: Double? = nil, lng: Double? = nil) {
         guard !isOnBreak else { return }
         isOnBreak = true
         currentBreakStartTime = Date()
@@ -67,7 +107,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    public func endBreak() {
+    public func endBreak(lat: Double? = nil, lng: Double? = nil) {
         guard isOnBreak, let startTime = currentBreakStartTime else { return }
         timer?.invalidate()
         timer = nil
@@ -85,8 +125,8 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
         let log = BreakLog(
             id: UUID().uuidString,
-            tripId: tripId,
-            driverId: driverId,
+            tripId: self.tripId.isEmpty ? nil : self.tripId,
+            driverId: self.driverId.isEmpty ? nil : self.driverId,
             breakType: selectedBreakType.rawValue,
             startTime: startTime,
             endTime: endTime,
@@ -94,12 +134,14 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
             lat: startLocation?.coordinate.latitude,
             lng: startLocation?.coordinate.longitude,
             endLat: endLocation?.coordinate.latitude,
-            endLng: endLocation?.coordinate.longitude
+            endLng: endLocation?.coordinate.longitude,
+            notes: notes.isEmpty ? nil : notes
         )
 
         breakLogs.insert(log, at: 0)
         currentBreakStartTime = nil
         currentBreakElapsedSeconds = 0
+        notes = ""
 
         Task {
             await saveBreakLog(log)
@@ -111,6 +153,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
     public func fetchBreakHistory() {
         Task {
             do {
+                guard !tripId.isEmpty else { return }
                 let response = try await SupabaseService.shared.client
                     .from("break_logs")
                     .select()
@@ -128,8 +171,43 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
                     ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast)
                 }
             } catch {
-                // Will show whatever is in memory
+                print("⚠️ [BreakLogViewModel] Failed to load breaks (silent fallback): \(error)")
+                self.errorMessage = "Failed to fetch break history: \(error.localizedDescription)"
             }
+        }
+    }
+    
+    /// Loads breaks by driver across trips (Crash Recovery endpoint)
+    public func loadBreaks(driverId: String) async {
+        do {
+            let response = try await SupabaseService.shared.client
+                .from("break_logs")
+                .select()
+                .eq("driver_id", value: driverId)
+                .order("start_time", ascending: false)
+                .limit(50)
+                .execute()
+
+            let breaks = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
+            self.breakLogs = breaks.filter { !$0.isOngoing }
+            
+            if let openBreak = breaks.first(where: { $0.isOngoing }) {
+                self.isOnBreak = true
+                self.currentBreakStartTime = openBreak.startTime
+                self.selectedBreakType = BreakType(rawValue: openBreak.breakType ?? "rest") ?? .rest
+                
+                // Resume elapsed counting via standard start dispatch
+                timer?.invalidate()
+                timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, let start = self.currentBreakStartTime else { return }
+                        self.currentBreakElapsedSeconds = Date().timeIntervalSince(start)
+                    }
+                }
+            }
+        } catch {
+            print("⚠️ [BreakLogViewModel] Failed to load driver breaks: \(error)")
+            self.errorMessage = "Failed to load breaks: \(error.localizedDescription)"
         }
     }
 
@@ -147,7 +225,8 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
             lat: log.lat,
             lng: log.lng,
             endLat: log.endLat,
-            endLng: log.endLng
+            endLng: log.endLng,
+            notes: log.notes
         )
 
         _ = await OfflineQueueService.shared.insertOrQueue(
