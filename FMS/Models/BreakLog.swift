@@ -55,6 +55,7 @@ public struct BreakLog: Codable, Identifiable {
 }
 
 public struct BreakLogInsert: Codable {
+    public var id: String
     public var tripId: String?
     public var driverId: String?
     public var breakType: String?
@@ -67,6 +68,7 @@ public struct BreakLogInsert: Codable {
     public var endLng: Double?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case tripId = "trip_id"
         case driverId = "driver_id"
         case breakType = "break_type"

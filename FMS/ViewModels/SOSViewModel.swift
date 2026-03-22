@@ -108,6 +108,7 @@ public final class SOSViewModel: NSObject, CLLocationManagerDelegate {
         sosAlertId = alertId
 
         let alert = SOSAlertInsert(
+            id: alertId,
             driverId: driverId,
             vehicleId: vehicleId,
             tripId: tripId,

@@ -65,7 +65,9 @@ public final class OfflineQueueService {
 
     /// Queue a payload directly (without attempting insert first).
     public func enqueue<T: Encodable>(table: String, payload: T, type: QueuedPayloadType) {
-        guard let jsonData = try? JSONEncoder().encode(payload) else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let jsonData = try? encoder.encode(payload) else { return }
         let queued = QueuedPayload(type: type, tableName: table, jsonData: jsonData)
         var queue = loadQueue()
         queue.append(queued)

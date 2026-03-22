@@ -136,6 +136,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     private func saveBreakLog(_ log: BreakLog) async {
         let insert = BreakLogInsert(
+            id: log.id,
             tripId: log.tripId,
             driverId: log.driverId,
             breakType: log.breakType,

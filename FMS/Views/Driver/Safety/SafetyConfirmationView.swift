@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SafetyConfirmationView: View {
     @Bindable var safetyViewModel: SafetyViewModel

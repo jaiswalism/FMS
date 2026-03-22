@@ -68,6 +68,7 @@ public struct SOSAlert: Codable, Identifiable {
 // MARK: - SOS Alert Insert
 
 public struct SOSAlertInsert: Codable {
+    public var id: String
     public var driverId: String
     public var vehicleId: String
     public var tripId: String?
@@ -78,6 +79,7 @@ public struct SOSAlertInsert: Codable {
     public var status: String
 
     enum CodingKeys: String, CodingKey {
+        case id
         case driverId = "driver_id"
         case vehicleId = "vehicle_id"
         case tripId = "trip_id"
