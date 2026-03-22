@@ -24,97 +24,48 @@ public struct MaintenancePredictionService {
         return 10000.0
     }
     
-    public static var defaultIntervalMonths: Int {
-        if let monthsStr = UserDefaults.standard.string(forKey: "fms_global_interval_months"), let months = Int(monthsStr) {
-            return months
-        }
-        return 6
-    }
     public static let upcomingThresholdPercentage: Double = 0.9 // 90% of interval
-    public static let upcomingThresholdDays: Int = 15 // 15 days before month interval
     
     /// Calculates the maintenance status for a vehicle.
-    public static func calculateStatus(for vehicle: Vehicle, defaultKm: Double? = nil, defaultMonths: Int? = nil) -> MaintenanceStatus {
+    public static func calculateStatus(for vehicle: Vehicle, defaultKm: Double? = nil) -> MaintenanceStatus {
         let rawIntervalKm = vehicle.serviceIntervalKm ?? defaultKm ?? defaultIntervalKm
-        let rawIntervalMonths = defaultMonths ?? defaultIntervalMonths
         
         // Ensure intervals are positive to avoid division by zero or negative logic
         let intervalKm = max(rawIntervalKm, 1.0)
-        let intervalMonths = max(rawIntervalMonths, 1)
         
-        // 1. Odometer-based calculation
+        // Odometer-based calculation
         let currentOdo = vehicle.odometer ?? 0
         let lastOdo = vehicle.lastServiceOdometer ?? 0
         let distanceSinceLast = currentOdo - lastOdo
         
-        let odoStatus: MaintenanceStatus
         if distanceSinceLast >= intervalKm {
-            odoStatus = .due
-        } else if distanceSinceLast >= (intervalKm * upcomingThresholdPercentage) {
-            odoStatus = .upcoming
-        } else {
-            odoStatus = .ok
-        }
-        
-        // 2. Time-based calculation
-        let lastDate = vehicle.lastServiceDate ?? vehicle.createdAt ?? Date()
-        let calendar = Calendar.current
-        guard let dueDate = calendar.date(byAdding: .month, value: intervalMonths, to: lastDate) else {
-            return odoStatus
-        }
-        
-        let daysUntilDue = calendar.dateComponents([.day], from: Date(), to: dueDate).day ?? 0
-        
-        let timeStatus: MaintenanceStatus
-        if Date() >= dueDate {
-            timeStatus = .due
-        } else if daysUntilDue <= upcomingThresholdDays {
-            timeStatus = .upcoming
-        } else {
-            timeStatus = .ok
-        }
-        
-        // Return the most critical status
-        if odoStatus == .due || timeStatus == .due {
             return .due
-        }
-        if odoStatus == .upcoming || timeStatus == .upcoming {
+        } else if distanceSinceLast >= (intervalKm * upcomingThresholdPercentage) {
             return .upcoming
+        } else {
+            return .ok
         }
-        return .ok
     }
     
     /// Returns a human-readable reason for the status.
-    public static func getStatusReason(for vehicle: Vehicle, defaultKm: Double? = nil, defaultMonths: Int? = nil) -> String {
-        let status = calculateStatus(for: vehicle, defaultKm: defaultKm, defaultMonths: defaultMonths)
+    public static func getStatusReason(for vehicle: Vehicle, defaultKm: Double? = nil) -> String {
+        let status = calculateStatus(for: vehicle, defaultKm: defaultKm)
         if status == .ok { return "Vehicle is in good condition." }
         
         let rawIntervalKm = vehicle.serviceIntervalKm ?? defaultKm ?? defaultIntervalKm
-        let rawIntervalMonths = defaultMonths ?? defaultIntervalMonths
         let intervalKm = max(rawIntervalKm, 1.0)
-        let intervalMonths = max(rawIntervalMonths, 1)
         let currentOdo = vehicle.odometer ?? 0
         let lastOdo = vehicle.lastServiceOdometer ?? 0
         let distanceSinceLast = currentOdo - lastOdo
         
-        let lastDate = vehicle.lastServiceDate ?? vehicle.createdAt ?? Date()
-        let calendar = Calendar.current
-        let dueDate = calendar.date(byAdding: .month, value: intervalMonths, to: lastDate) ?? Date()
-        
         if distanceSinceLast >= intervalKm {
             return "Mileage limit reached (\(Int(distanceSinceLast)) / \(Int(intervalKm)) km)."
-        }
-        
-        if Date() >= dueDate {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            return "Time limit reached (Due since \(formatter.string(from: dueDate)))."
         }
         
         if distanceSinceLast >= (intervalKm * upcomingThresholdPercentage) {
             return "Approaching mileage limit (\(Int(distanceSinceLast)) km)."
         }
         
-        return "Approaching time limit."
+        return "Service required."
     }
 }

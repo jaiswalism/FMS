@@ -133,13 +133,11 @@ public struct VehicleServiceCard: View {
         let settingsStore = MaintenanceSettingsStore.shared
         let status = MaintenancePredictionService.calculateStatus(
             for: vehicle, 
-            defaultKm: settingsStore.intervalKmDouble, 
-            defaultMonths: settingsStore.intervalMonthsInt
+            defaultKm: settingsStore.intervalKmDouble
         )
         let reason = MaintenancePredictionService.getStatusReason(
             for: vehicle, 
-            defaultKm: settingsStore.intervalKmDouble, 
-            defaultMonths: settingsStore.intervalMonthsInt
+            defaultKm: settingsStore.intervalKmDouble
         )
         
         VStack(alignment: .leading, spacing: 16) {

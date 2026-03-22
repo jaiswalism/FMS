@@ -205,8 +205,7 @@ public struct MaintenanceManagerView: View {
             result = result.filter { 
                 MaintenancePredictionService.calculateStatus(
                     for: $0, 
-                    defaultKm: settingsStore.intervalKmDouble, 
-                    defaultMonths: settingsStore.intervalMonthsInt
+                    defaultKm: settingsStore.intervalKmDouble
                 ) == statusFilter 
             }
         }
@@ -227,8 +226,7 @@ public struct MaintenanceManagerView: View {
         return realVehicles.filter { 
             MaintenancePredictionService.calculateStatus(
                 for: $0, 
-                defaultKm: settingsStore.intervalKmDouble, 
-                defaultMonths: settingsStore.intervalMonthsInt
+                defaultKm: settingsStore.intervalKmDouble
             ) == .due 
         }.count
     }
@@ -238,8 +236,7 @@ public struct MaintenanceManagerView: View {
         return realVehicles.filter { 
             MaintenancePredictionService.calculateStatus(
                 for: $0, 
-                defaultKm: settingsStore.intervalKmDouble, 
-                defaultMonths: settingsStore.intervalMonthsInt
+                defaultKm: settingsStore.intervalKmDouble
             ) == .upcoming 
         }.count
     }
@@ -249,8 +246,7 @@ public struct MaintenanceManagerView: View {
         return realVehicles.filter { 
             MaintenancePredictionService.calculateStatus(
                 for: $0, 
-                defaultKm: settingsStore.intervalKmDouble, 
-                defaultMonths: settingsStore.intervalMonthsInt
+                defaultKm: settingsStore.intervalKmDouble
             ) == .ok 
         }.count
     }

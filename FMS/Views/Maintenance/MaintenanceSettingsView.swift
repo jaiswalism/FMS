@@ -38,9 +38,6 @@ struct MaintenanceSettingsView: View {
             .onChange(of: settingsStore.globalIntervalKm) { 
                 Task { try? await settingsStore.save() }
             }
-            .onChange(of: settingsStore.globalIntervalMonths) { 
-                Task { try? await settingsStore.save() }
-            }
         }
     }
     
@@ -52,7 +49,6 @@ struct MaintenanceSettingsView: View {
             
             VStack(spacing: 16) {
                 settingsRow(title: "Service Interval (KM)", icon: "speedometer", text: Bindable(settingsStore).globalIntervalKm)
-                settingsRow(title: "Service Interval (Months)", icon: "calendar", text: Bindable(settingsStore).globalIntervalMonths)
             }
             .padding(16)
             .background(FMSTheme.cardBackground)
@@ -157,7 +153,9 @@ struct VehicleOverrideCard: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 14))
+                        .padding(8)
                 }
+                .buttonStyle(BorderlessButtonStyle())
             }
             
             Divider()
@@ -168,14 +166,6 @@ struct VehicleOverrideCard: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(FMSTheme.textTertiary)
                     Text("\(Int(vehicle.serviceIntervalKm ?? 0)) km")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Month Interval")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(FMSTheme.textTertiary)
-                    Text("\(MaintenanceSettingsStore.shared.intervalMonthsInt) months")
                         .font(.system(size: 14, weight: .semibold))
                 }
             }
@@ -189,9 +179,23 @@ struct VehicleOverrideCard: View {
     private func clearOverride() {
         Task {
             do {
-                var updated = vehicle
-                updated.serviceIntervalKm = nil
-                try await fleetViewModel.updateVehicle(updated)
+                // Explicitly send null to database (Encodable might strip nil values otherwise)
+                struct NullUpdate: Encodable {
+                    func encode(to encoder: Encoder) throws {
+                        var container = encoder.container(keyedBy: CodingKeys.self)
+                        try container.encodeNil(forKey: .service_interval_km)
+                    }
+                    enum CodingKeys: String, CodingKey {
+                        case service_interval_km
+                    }
+                }
+                
+                try await SupabaseService.shared.client
+                    .from("vehicles")
+                    .update(NullUpdate())
+                    .eq("id", value: vehicle.id)
+                    .execute()
+                
                 await onUpdate()
             } catch {
                 print("Failed to delete override: \(error)")

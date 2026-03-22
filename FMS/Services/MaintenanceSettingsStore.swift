@@ -6,7 +6,6 @@ import Supabase
 @Observable
 public class MaintenanceSettingsStore {
     public var globalIntervalKm: String = "10000"
-    public var globalIntervalMonths: String = "6"
     public var isLoading = false
     
     public static let shared = MaintenanceSettingsStore()
@@ -32,7 +31,6 @@ public class MaintenanceSettingsStore {
             
             if let systemVehicle = response.first {
                 self.globalIntervalKm = String(format: "%.0f", systemVehicle.serviceIntervalKm ?? 10000)
-                self.globalIntervalMonths = "6" // Default; serviceIntervalMonths removed from Vehicle
                 saveToLocal()
                 print("MaintenanceSettingsStore: Remote config loaded")
             } else {
@@ -54,7 +52,6 @@ public class MaintenanceSettingsStore {
             fuel_type: "petrol",
             odometer: 0,
             service_interval_km: intervalKmDouble,
-            service_interval_months: intervalMonthsInt,
             status: "inactive"
         )
         
@@ -70,22 +67,14 @@ public class MaintenanceSettingsStore {
         if let km = UserDefaults.standard.string(forKey: "fms_global_interval_km") {
             globalIntervalKm = km
         }
-        if let months = UserDefaults.standard.string(forKey: "fms_global_interval_months") {
-            globalIntervalMonths = months
-        }
     }
     
     private func saveToLocal() {
         UserDefaults.standard.set(globalIntervalKm, forKey: "fms_global_interval_km")
-        UserDefaults.standard.set(globalIntervalMonths, forKey: "fms_global_interval_months")
     }
     
     public var intervalKmDouble: Double {
         Double(globalIntervalKm) ?? 10000.0
-    }
-    
-    public var intervalMonthsInt: Int {
-        Int(globalIntervalMonths) ?? 6
     }
 }
 
@@ -97,6 +86,5 @@ private struct SystemRow: Encodable {
     let fuel_type: String
     let odometer: Double
     let service_interval_km: Double
-    let service_interval_months: Int
     let status: String
 }
