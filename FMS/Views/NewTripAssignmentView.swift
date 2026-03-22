@@ -503,11 +503,15 @@ public struct NewTripAssignmentView: View {
 
         if let orderId = trip.orderId {
             do {
-                let rows: [Order] = try await SupabaseService.shared.client
+                struct OrderSubset: Decodable {
+                    let order_number: String?
+                    let waypoints: [Waypoint]?
+                }
+                let rows: [OrderSubset] = try await SupabaseService.shared.client
                     .from("orders").select("order_number, waypoints").eq("id", value: orderId).execute().value
                 if let order = rows.first {
                     await MainActor.run {
-                        orderNumber    = order.orderNumber
+                        orderNumber    = order.order_number
                         orderWaypoints = order.waypoints ?? []
                     }
                 }

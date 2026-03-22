@@ -53,10 +53,8 @@ public struct Trip: Codable, Identifiable, Hashable {
         case endLng              = "end_lng"
         case endName             = "end_name"
         case distanceKm          = "distance_km"
-        // Kept as _min to match existing DB column names.
-        // If you run a migration renaming them to _minutes, update these two keys to match.
-        case estimatedDurationMin = "estimated_duration_min"
-        case actualDurationMin    = "actual_duration_min"
+        case estimatedDurationMin = "estimated_duration_minutes"
+        case actualDurationMin    = "actual_duration_minutes"
         case fuelUsedLiters      = "fuel_used_liters"
         case status
         case createdBy           = "created_by"
