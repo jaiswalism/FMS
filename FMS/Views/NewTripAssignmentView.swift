@@ -180,25 +180,11 @@ public struct NewTripAssignmentView: View {
         .fullScreenCover(isPresented: $showLocationConfirmation) {
             LocationTrackingConfirmationView(trip: trip)
         }
-        .fullScreenCover(isPresented: $showTripExecution) {
-            NavigationStack {
-                DriverTripExecutionView(
-                    trip: trip,
-                    locationManager: viewModel.locationManager,
-                    onStartTrip: { _ in
-                        viewModel.startTrip(trip)
-                    },
-                    onEndTrip: { _ in
-                        viewModel.endTrip()
-                    }
-                )
-            }
-        }
         .onChange(of: showLocationConfirmation) { _, isShowing in
             if !isShowing {
                 dismiss() // Drop down to dashboard when splash finishes
+                preTripInspectionCompleted = false
             }
-            preTripInspectionCompleted = false
         }
         .onChange(of: showPreTripInspection) { _, isShowing in
             if !isShowing {

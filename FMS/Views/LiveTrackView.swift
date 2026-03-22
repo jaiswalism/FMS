@@ -224,8 +224,8 @@ public struct LiveTrackView: View {
     private func calculateRoute() async {
         guard let origin = originCoord, let dest = destinationCoord else { return }
         let request = MKDirections.Request()
-        request.source       = MKMapItem(placemark: MKPlacemark(coordinate: origin))
-        request.destination  = MKMapItem(placemark: MKPlacemark(coordinate: dest))
+        request.source       = MKMapItem(location: CLLocation(latitude: origin.latitude, longitude: origin.longitude), address: nil)
+        request.destination  = MKMapItem(location: CLLocation(latitude: dest.latitude, longitude: dest.longitude), address: nil)
         request.transportType = .automobile
         do {
             let response = try await MKDirections(request: request).calculate()

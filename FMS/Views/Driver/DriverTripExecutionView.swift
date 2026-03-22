@@ -44,14 +44,17 @@ public struct DriverTripExecutionView: View {
         self.onStartTrip = onStartTrip
         self.onEndTrip = onEndTrip
 
-        let pickup = CLLocationCoordinate2D(
-            latitude: trip.startLat ?? 0,
-            longitude: trip.startLng ?? 0
-        )
-        let destination = CLLocationCoordinate2D(
-            latitude: trip.endLat ?? 0,
-            longitude: trip.endLng ?? 0
-        )
+        let pickup: CLLocationCoordinate2D? = if let lat = trip.startLat, let lng = trip.startLng {
+            CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        } else {
+            nil
+        }
+        
+        let destination: CLLocationCoordinate2D? = if let lat = trip.endLat, let lng = trip.endLng {
+            CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        } else {
+            nil
+        }
 
         _viewModel = StateObject(
             wrappedValue: TripExecutionViewModel(
@@ -215,6 +218,16 @@ public struct DriverTripExecutionView: View {
                 Text("End Time: \(dateFormatter.string(from: end))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(FMSTheme.textSecondary)
+            }
+
+            if trip.startLat == nil || trip.startLng == nil || trip.endLat == nil || trip.endLng == nil {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("Trip coordinates missing. Geofencing disabled.")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(FMSTheme.alertOrange)
+                .padding(.top, 4)
             }
         }
         .padding(16)

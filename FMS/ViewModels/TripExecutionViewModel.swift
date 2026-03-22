@@ -1,6 +1,8 @@
 import Foundation
 import CoreLocation
 import Combine
+import Supabase
+import PostgREST
 
 public func isInsideGeofence(current: CLLocation, target: CLLocation, radius: Double) -> Bool {
     current.distance(from: target) <= radius
@@ -24,12 +26,17 @@ public final class TripExecutionViewModel: ObservableObject {
     @Published public private(set) var insideDestinationGeofence = false
 
     private let tripId: String
-    private let pickupLocation: CLLocation
-    private let destinationLocation: CLLocation
+    private let pickupLocation: CLLocation?
+    private let destinationLocation: CLLocation?
 
     private weak var locationManager: LocationManager?
     private var locationSubscription: AnyCancellable?
     private var samplingTimer: Timer?
+    private var syncTimer: Timer?
+
+    private let maxBatchSize = 50
+    private var syncRetryCount = 0
+    private var isSyncing = false
 
     // Hysteresis counters to avoid rapid toggling on GPS drift.
     private var pickupInsideHits = 0
@@ -40,12 +47,21 @@ public final class TripExecutionViewModel: ObservableObject {
 
     public init(
         tripId: String,
-        pickupCoordinate: CLLocationCoordinate2D,
-        destinationCoordinate: CLLocationCoordinate2D
+        pickupCoordinate: CLLocationCoordinate2D?,
+        destinationCoordinate: CLLocationCoordinate2D?
     ) {
         self.tripId = tripId
-        self.pickupLocation = CLLocation(latitude: pickupCoordinate.latitude, longitude: pickupCoordinate.longitude)
-        self.destinationLocation = CLLocation(latitude: destinationCoordinate.latitude, longitude: destinationCoordinate.longitude)
+        if let pickup = pickupCoordinate {
+            self.pickupLocation = CLLocation(latitude: pickup.latitude, longitude: pickup.longitude)
+        } else {
+            self.pickupLocation = nil
+        }
+        
+        if let destination = destinationCoordinate {
+            self.destinationLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+        } else {
+            self.destinationLocation = nil
+        }
     }
 
     public func attachLocationManager(_ manager: LocationManager) {
@@ -63,15 +79,17 @@ public final class TripExecutionViewModel: ObservableObject {
     }
 
     public var canStartTrip: Bool {
-        hasLocationPermission && !hasStartedTrip && insidePickupGeofence
+        guard let _ = pickupLocation else { return false }
+        return hasLocationPermission && !hasStartedTrip && insidePickupGeofence
     }
 
     public var canEndTrip: Bool {
-        hasLocationPermission && hasStartedTrip && !hasEndedTrip && insideDestinationGeofence
+        guard let _ = destinationLocation else { return false }
+        return hasLocationPermission && hasStartedTrip && !hasEndedTrip && insideDestinationGeofence
     }
 
     public func requestPermissionsAndTracking() {
-        locationManager?.requestAlwaysPermission()
+        locationManager?.requestWhenInUsePermission()
         locationManager?.startUpdating()
     }
 
@@ -100,6 +118,8 @@ public final class TripExecutionViewModel: ObservableObject {
     public func stopTracking() {
         samplingTimer?.invalidate()
         samplingTimer = nil
+        syncTimer?.invalidate()
+        syncTimer = nil
         locationManager?.stopUpdating()
         print("[TripExecution] Stopped location tracking for trip \(tripId)")
     }
@@ -148,8 +168,19 @@ public final class TripExecutionViewModel: ObservableObject {
                 self?.captureImmediateSample()
             }
         }
-        RunLoop.main.add(samplingTimer!, forMode: .common)
         captureImmediateSample()
+
+        setupSyncTimer()
+    }
+
+    private func setupSyncTimer() {
+        syncTimer?.invalidate()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.syncSamplesToSupabase()
+            }
+        }
+        RunLoop.main.add(syncTimer!, forMode: .common)
     }
 
     private func captureImmediateSample() {
@@ -162,28 +193,74 @@ public final class TripExecutionViewModel: ObservableObject {
             timestamp: Date()
         )
         samplesReadyForSync.append(sample)
+        
+        Task { @MainActor in
+            await syncSamplesToSupabase()
+        }
+    }
+
+    public func syncSamplesToSupabase() async {
+        guard !isSyncing, !samplesReadyForSync.isEmpty else { return }
+        isSyncing = true
+        
+        let batch = Array(samplesReadyForSync.prefix(maxBatchSize))
+        print("[TripSync] Attempting to sync batch of \(batch.count) samples for trip \(tripId)")
+        
+        do {
+            try await SupabaseService.shared.client
+                .from("trip_location_samples")
+                .insert(batch)
+                .execute()
+            
+            // On success: remove uploaded samples and reset retry count
+            samplesReadyForSync.removeFirst(batch.count)
+            syncRetryCount = 0
+            isSyncing = false
+            print("[TripSync] Successfully synced \(batch.count) samples. Remaining in queue: \(samplesReadyForSync.count)")
+            
+            // If there's more data, trigger another sync immediately
+            if !samplesReadyForSync.isEmpty {
+                await syncSamplesToSupabase()
+            }
+        } catch {
+            isSyncing = false
+            syncRetryCount += 1
+            let delay = min(Double(pow(2.0, Double(syncRetryCount))), 300.0) // Max 5 min delay
+            print("[TripSync] Sync failed: \(error.localizedDescription). Retry count: \(syncRetryCount). Backing off for \(Int(delay))s")
+            
+            // Schedule retry with exponential backoff
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                Task { [weak self] in
+                    await self?.syncSamplesToSupabase()
+                }
+            }
+        }
     }
 
     private func consume(location: CLLocation) {
-        let pickupDistance = location.distance(from: pickupLocation)
-        let destinationDistance = location.distance(from: destinationLocation)
+        if let pickup = pickupLocation {
+            let pickupDistance = location.distance(from: pickup)
+            pickupDistanceMeters = pickupDistance
+            
+            updateSmoothedGeofence(
+                distance: pickupDistance,
+                insideCount: &pickupInsideHits,
+                outsideCount: &pickupOutsideHits,
+                output: &insidePickupGeofence
+            )
+        }
 
-        pickupDistanceMeters = pickupDistance
-        destinationDistanceMeters = destinationDistance
-
-        updateSmoothedGeofence(
-            distance: pickupDistance,
-            insideCount: &pickupInsideHits,
-            outsideCount: &pickupOutsideHits,
-            output: &insidePickupGeofence
-        )
-
-        updateSmoothedGeofence(
-            distance: destinationDistance,
-            insideCount: &destinationInsideHits,
-            outsideCount: &destinationOutsideHits,
-            output: &insideDestinationGeofence
-        )
+        if let destination = destinationLocation {
+            let destinationDistance = location.distance(from: destination)
+            destinationDistanceMeters = destinationDistance
+                
+            updateSmoothedGeofence(
+                distance: destinationDistance,
+                insideCount: &destinationInsideHits,
+                outsideCount: &destinationOutsideHits,
+                output: &insideDestinationGeofence
+            )
+        }
     }
 
     private func updateSmoothedGeofence(

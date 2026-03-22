@@ -20,8 +20,9 @@ public final class LocationManager: NSObject, ObservableObject {
         manager.distanceFilter = 10
         manager.pausesLocationUpdatesAutomatically = false
         manager.activityType = .automotiveNavigation
-        // Background updates disabled by default to prevent crash without Xcode background capability
-        // manager.allowsBackgroundLocationUpdates = true
+        // Background updates requires Xcode Background Modes capability.
+        // Set to false to prevent crash (CLClientIsBackgroundable error) if not configured.
+        manager.allowsBackgroundLocationUpdates = false
     }
 
     public var isAuthorizedForTrip: Bool {
@@ -33,14 +34,11 @@ public final class LocationManager: NSObject, ObservableObject {
     }
 
     public func requestAlwaysPermission() {
-        switch manager.authorizationStatus {
-        case .notDetermined:
-            manager.requestWhenInUseAuthorization()
-        case .authorizedWhenInUse:
-            manager.requestAlwaysAuthorization()
-        default:
-            break
-        }
+        manager.requestAlwaysAuthorization()
+    }
+
+    public func requestWhenInUsePermission() {
+        manager.requestWhenInUseAuthorization()
     }
 
     public func startUpdating() {

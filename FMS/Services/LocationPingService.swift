@@ -50,7 +50,7 @@ public final class LocationPingService {
         self.tripId = tripId
         self.isRunning = true
         self.pingCount = 0
-        print("[LocationPingService) ✅ Started pinging for trip \(tripId)")
+        print("[LocationPingService] ✅ Started pinging for trip \(tripId)")
         
         // Ensure location manager is updating
         locationManager.startUpdating()

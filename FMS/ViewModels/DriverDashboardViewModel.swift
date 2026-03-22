@@ -121,7 +121,7 @@ public final class DriverDashboardViewModel {
     public func fetchLiveDashboardData() async {
         self.isLoading = true
         self.errorMessage = nil
-        locationManager.requestAlwaysPermission()
+        locationManager.requestWhenInUsePermission()
         do {
             let session = try await SupabaseService.shared.client.auth.session
             let currentUserId = session.user.id.uuidString
