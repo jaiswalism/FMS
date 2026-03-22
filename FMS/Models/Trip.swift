@@ -26,8 +26,8 @@ public struct Trip: Codable, Identifiable, Hashable {
     public var endLng: Double?
     public var endName: String?
     public var distanceKm: Double?
-    public var estimatedDurationMin: Int?
-    public var actualDurationMin: Int?
+    public var estimatedDurationMinutes: Int?
+    public var actualDurationMinutes: Int?
     public var fuelUsedLiters: Double?
     public var status: String?
     public var createdBy: String?
@@ -53,10 +53,8 @@ public struct Trip: Codable, Identifiable, Hashable {
         case endLng              = "end_lng"
         case endName             = "end_name"
         case distanceKm          = "distance_km"
-        // Kept as _min to match existing DB column names.
-        // If you run a migration renaming them to _minutes, update these two keys to match.
-        case estimatedDurationMin = "estimated_duration_min"
-        case actualDurationMin    = "actual_duration_min"
+        case estimatedDurationMinutes = "estimated_duration_minutes"
+        case actualDurationMinutes    = "actual_duration_minutes"
         case fuelUsedLiters      = "fuel_used_liters"
         case status
         case createdBy           = "created_by"
