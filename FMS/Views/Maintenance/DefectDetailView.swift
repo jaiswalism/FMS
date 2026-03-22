@@ -310,24 +310,29 @@ private struct DefectPhotoGallery: View {
                 HStack(spacing: 10) {
                     ForEach(Array(validImageUrls.enumerated()), id: \.offset) { index, urlStr in
                         if let url = URL(string: urlStr) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 140, height: 140)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .onTapGesture { selectedIndex = index }
-                                case .failure:
-                                    photoPlaceholder(icon: "exclamationmark.triangle")
-                                case .empty:
-                                    photoPlaceholder(icon: "photo")
-                                        .overlay(ProgressView().tint(.white))
-                                @unknown default:
-                                    photoPlaceholder(icon: "photo")
+                            Button {
+                                selectedIndex = index
+                            } label: {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 140, height: 140)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    case .failure:
+                                        photoPlaceholder(icon: "exclamationmark.triangle")
+                                    case .empty:
+                                        photoPlaceholder(icon: "photo")
+                                            .overlay(ProgressView().tint(.white))
+                                    @unknown default:
+                                        photoPlaceholder(icon: "photo")
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Photo \(index + 1) of \(validImageUrls.count)")
                         }
                     }
                 }

@@ -204,9 +204,7 @@ public final class ShiftViewModel {
         .order("start_time", ascending: true)
         .execute()
 
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      let fetched = try decoder.decode([BreakLog].self, from: response.data)
+      let fetched = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
       breakLogs = fetched
       timelineEntries = buildTimeline()
     } catch {

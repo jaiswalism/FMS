@@ -163,6 +163,7 @@ public struct DriverDashboardView: View {
                 updateBreakLogViewModel()
             } else {
                 safetyViewModel.stopDriving()
+                breakLogViewModel?.stopLocationUpdates()
                 breakLogViewModel = nil
             }
         }

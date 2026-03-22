@@ -55,6 +55,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         currentBreakStartTime = Date()
         currentBreakElapsedSeconds = 0
         showMinDurationWarning = false
+        locationManager?.requestLocation()
         startLocation = currentLocation ?? locationManager?.location
 
         timer?.invalidate()
@@ -72,6 +73,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         timer = nil
         isOnBreak = false
 
+        locationManager?.requestLocation()
         let endTime = Date()
         let duration = endTime.timeIntervalSince(startTime)
         let durationMinutes = Int(duration / 60)
@@ -117,9 +119,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
                     .limit(50)
                     .execute()
 
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let fetched = try decoder.decode([BreakLog].self, from: response.data)
+                let fetched = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
 
                 // Merge: keep locally-logged breaks, add any from DB not already present
                 let localIds = Set(breakLogs.map(\.id))
@@ -164,7 +164,13 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         locationManager?.delegate = self
         locationManager?.desiredAccuracy = kCLLocationAccuracyBest
         locationManager?.requestWhenInUseAuthorization()
-        locationManager?.startUpdatingLocation()
+    }
+
+    /// Stop location updates and clean up resources.
+    public func stopLocationUpdates() {
+        locationManager?.stopUpdatingLocation()
+        locationManager?.delegate = nil
+        locationManager = nil
     }
 
     // CLLocationManagerDelegate
@@ -173,5 +179,9 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         Task { @MainActor in
             self.currentLocation = location
         }
+    }
+
+    nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // Best-effort location — break log will use nil coordinates
     }
 }

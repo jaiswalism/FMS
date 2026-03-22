@@ -288,9 +288,7 @@ public final class SOSViewModel: NSObject, CLLocationManagerDelegate {
                     .single()
                     .execute()
 
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let alert = try decoder.decode(SOSAlert.self, from: response.data)
+                let alert = try JSONDecoder.supabase().decode(SOSAlert.self, from: response.data)
 
                 let previousStatus = alertStatus
                 alertStatus = alert.status

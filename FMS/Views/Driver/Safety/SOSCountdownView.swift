@@ -210,8 +210,8 @@ struct SOSCountdownView: View {
                         .background(.white.opacity(0.15))
                         .cornerRadius(14)
                 }
-            } else {
-                // During countdown — cancel
+            } else if case .countdown = viewModel.state {
+                // During countdown only — cancel
                 Button {
                     viewModel.cancelCountdown()
                     onCancelled()
