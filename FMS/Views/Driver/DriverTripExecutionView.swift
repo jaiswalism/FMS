@@ -10,8 +10,8 @@ public struct DriverTripExecutionView: View {
     private let onEndTrip: ((Date) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var locationManager: LocationManager
-    @StateObject private var viewModel: TripExecutionViewModel
+    var locationManager: LocationManager
+    @State private var viewModel: TripExecutionViewModel
 
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var showEndTripAlert = false
@@ -56,8 +56,8 @@ public struct DriverTripExecutionView: View {
             nil
         }
 
-        _viewModel = StateObject(
-            wrappedValue: TripExecutionViewModel(
+        self._viewModel = State(
+            initialValue: TripExecutionViewModel(
                 tripId: trip.id,
                 pickupCoordinate: pickup,
                 destinationCoordinate: destination

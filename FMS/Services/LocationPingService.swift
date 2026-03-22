@@ -95,6 +95,12 @@ public final class LocationPingService {
             return
         }
 
+        let age = Date().timeIntervalSince(location.timestamp)
+        guard age <= pingInterval * 2 else {
+            print("[LocationPingService] ⚠️ Stale location fix (\(Int(age))s old), skipping ping")
+            return
+        }
+
         struct GPSLogInsert: Encodable {
             let trip_id: String
             let lat: Double
@@ -111,7 +117,9 @@ public final class LocationPingService {
             heading: location.course >= 0 ? location.course : nil
         )
 
+        #if DEBUG
         print("[LocationPingService] 📡 Sending ping to Supabase: \(payload.lat), \(payload.lng) for trip \(tripId)")
+        #endif
 
         do {
             let response = try await SupabaseService.shared.client

@@ -140,7 +140,7 @@ public struct NewTripAssignmentView: View {
             IssueReportView(viewModel: viewModel)
         }
         .fullScreenCover(isPresented: $showPreTripInspection) {
-            if let vehicle = viewModel.assignedVehicle {
+            if let vehicle = tripVehicle ?? viewModel.assignedVehicle {
                 InspectionChecklistView(
                     type: .preTrip,
                     vehicleId: vehicle.id,
@@ -160,7 +160,7 @@ public struct NewTripAssignmentView: View {
             }
         }
         .fullScreenCover(isPresented: $showPostTripInspection) {
-            if let vehicle = viewModel.assignedVehicle {
+            if let vehicle = tripVehicle ?? viewModel.assignedVehicle {
                 InspectionChecklistView(
                     type: .postTrip,
                     vehicleId: vehicle.id,
@@ -180,7 +180,7 @@ public struct NewTripAssignmentView: View {
             }
         }
         .fullScreenCover(isPresented: $showLocationConfirmation) {
-            LocationTrackingConfirmationView(trip: trip)
+            LocationTrackingConfirmationView(trip: currentTrip)
         }
         .onChange(of: showLocationConfirmation) { _, isShowing in
             if !isShowing {
@@ -214,38 +214,38 @@ public struct NewTripAssignmentView: View {
         VStack(spacing: 10) {
             if currentTrip.status?.lowercased() == "scheduled" {
                 Button {
-                    if viewModel.assignedVehicle != nil {
+                    if tripVehicle ?? viewModel.assignedVehicle != nil {
                         preTripInspectionCompleted = false
                         showPreTripInspection = true
                     }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill").font(.system(size: 14, weight: .bold))
-                        Text(viewModel.assignedVehicle == nil ? "Waiting for Vehicle" : "Start Trip")
+                        Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Waiting for Vehicle" : "Start Trip")
                             .font(.headline.weight(.bold))
                     }
                 }
                 .buttonStyle(.fmsPrimary)
-                .disabled(viewModel.assignedVehicle == nil)
+                .disabled(tripVehicle ?? viewModel.assignedVehicle == nil)
 
                 if currentTrip.endLat != nil && currentTrip.endLng != nil {
                     navigateButton
                 }
             } else if currentTrip.status?.lowercased() == "active" {
                 Button {
-                    if viewModel.assignedVehicle != nil {
+                    if tripVehicle ?? viewModel.assignedVehicle != nil {
                         postTripInspectionCompleted = false
                         showPostTripInspection = true
                     }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "flag.checkered").font(.system(size: 14, weight: .bold))
-                        Text(viewModel.assignedVehicle == nil ? "Missing Vehicle" : "End Trip")
+                        Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Missing Vehicle" : "End Trip")
                             .font(.headline.weight(.bold))
                     }
                 }
                 .buttonStyle(.fmsPrimary)
-                .disabled(viewModel.assignedVehicle == nil)
+                .disabled((tripVehicle ?? viewModel.assignedVehicle) == nil)
 
                 Button {
                     showIssueReport = true

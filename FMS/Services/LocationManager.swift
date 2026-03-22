@@ -1,12 +1,13 @@
 import Foundation
 import CoreLocation
-import Combine
+import Observation
 
 @MainActor
-public final class LocationManager: NSObject, ObservableObject {
-    @Published public private(set) var currentLocation: CLLocation?
-    @Published public private(set) var authorizationStatus: CLAuthorizationStatus
-    @Published public private(set) var lastError: Error?
+@Observable
+public final class LocationManager: NSObject {
+    public private(set) var currentLocation: CLLocation?
+    public private(set) var authorizationStatus: CLAuthorizationStatus
+    public private(set) var lastError: Error?
 
     private let manager: CLLocationManager
 
@@ -88,7 +89,9 @@ extension LocationManager: CLLocationManagerDelegate {
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         currentLocation = location
+        #if DEBUG
         print("[LocationManager] 📍 Location update: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        #endif
     }
 
     public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

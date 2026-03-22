@@ -184,12 +184,13 @@ public struct LiveTrackView: View {
             struct GPSRow: Decodable {
                 let lat: Double
                 let lng: Double
+                let speed: Double?
                 let recorded_at: Date
             }
 
             let rows: [GPSRow] = try await SupabaseService.shared.client
                 .from("trip_gps_logs")
-                .select("lat, lng, recorded_at")
+                .select("lat, lng, speed, recorded_at")
                 .eq("trip_id", value: tripId)
                 .order("recorded_at", ascending: false)
                 .limit(1)
@@ -202,7 +203,7 @@ public struct LiveTrackView: View {
                 withAnimation(.easeInOut(duration: 0.4)) {
                     self.driverCoordinate = coord
                 }
-                self.lastUpdatedAt = Date()
+                self.lastUpdatedAt = latest.recorded_at
 
                 if isInitialLoad {
                     cameraPosition = .camera(

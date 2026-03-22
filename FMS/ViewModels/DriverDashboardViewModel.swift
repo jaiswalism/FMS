@@ -205,12 +205,6 @@ public final class DriverDashboardViewModel {
         started.startTime = Date()
         self.activeTrip = started
         self.upcomingTrips.removeAll { $0.id == trip.id }
-        self.driver.availabilityStatus = .onTrip
-
-        // Start pinging location for this trip
-        print("[DriverDashboard] startTrip called for \(trip.id) — starting location updates and ping service")
-        locationManager.startUpdating()
-        pingService.start(tripId: trip.id)
 
         Task {
             do {
@@ -222,33 +216,36 @@ public final class DriverDashboardViewModel {
                 try await SupabaseService.shared.client
                     .from("trips").update(update).eq("id", value: trip.id).execute()
 
+                print("[DriverDashboard] Trip persisted as active — starting location updates and ping service")
+                locationManager.startUpdating()
+                pingService.start(tripId: trip.id)
+
                 struct UserUpdate: Encodable { let operational_status: String }
                 try await SupabaseService.shared.client
                     .from("users").update(UserUpdate(operational_status: "on_trip")).eq("id", value: driver.id).execute()
+                
+                self.driver.availabilityStatus = .onTrip
 
                 if let orderId = trip.orderId {
                     struct OrderUpdate: Encodable { let status: String }
                     try await SupabaseService.shared.client
                         .from("orders").update(OrderUpdate(status: "in_transit")).eq("id", value: orderId).execute()
                 }
-            } catch { print("Failed to start trip in DB: \(error)") }
+            } catch {
+                print("Failed to start trip in DB: \(error)")
+                locationManager.stopUpdating()
+                pingService.stop()
+            }
         }
     }
 
     public func endTrip() {
         guard var trip = activeTrip else { return }
 
-        // Stop location pinging
-        print("[DriverDashboard] endTrip called — stopping ping service")
-        pingService.stop()
-        locationManager.stopUpdating()
-
-        trip.status = "completed"
         trip.endTime = Date()
         self.completedTrips.insert(trip, at: 0)
         self.activeTrip = nil
         self.todayStats.tripsCompleted += 1
-        self.driver.availabilityStatus = .available
 
         Task {
             do {
@@ -270,6 +267,10 @@ public final class DriverDashboardViewModel {
                 try await SupabaseService.shared.client
                     .from("trips").update(update).eq("id", value: trip.id).execute()
 
+                print("[DriverDashboard] Trip persisted as completed — stopping ping service")
+                pingService.stop()
+                locationManager.stopUpdating()
+
                 if let orderId = trip.orderId {
                     struct OrderUpdate: Encodable { let status: String }
                     try await SupabaseService.shared.client
@@ -279,8 +280,16 @@ public final class DriverDashboardViewModel {
                 struct UserUpdate: Encodable { let operational_status: String }
                 try await SupabaseService.shared.client
                     .from("users").update(UserUpdate(operational_status: "available")).eq("id", value: driver.id).execute()
+                
+                // Update local status after successful backend write
+                self.driver.availabilityStatus = .available
 
-            } catch { print("Failed to complete trip in DB: \(error)") }
+            } catch {
+                print("Failed to complete trip in DB: \(error)")
+                // If fail, we still likely want to stop tracking as the driver thinks it's ended
+                pingService.stop()
+                locationManager.stopUpdating()
+            }
         }
     }
 

@@ -1,42 +1,43 @@
 import Foundation
 import CoreLocation
-import Combine
 import Supabase
 import PostgREST
+import Observation
 
 public func isInsideGeofence(current: CLLocation, target: CLLocation, radius: Double) -> Bool {
     current.distance(from: target) <= radius
 }
 
 @MainActor
-public final class TripExecutionViewModel: ObservableObject {
+@Observable
+public final class TripExecutionViewModel {
     public let geofenceRadius: Double = 1000
 
-    @Published public private(set) var currentPhase: TripPhase = .pickup
-    @Published public private(set) var startTime: Date?
-    @Published public private(set) var endTime: Date?
-    @Published public private(set) var hasStartedTrip = false
-    @Published public private(set) var hasEndedTrip = false
-    @Published public private(set) var isBreakActive = false
-    @Published public private(set) var samplesReadyForSync: [TripLocationSample] = []
+    public private(set) var currentPhase: TripPhase = .pickup
+    public private(set) var startTime: Date?
+    public private(set) var endTime: Date?
+    public private(set) var hasStartedTrip = false
+    public private(set) var hasEndedTrip = false
+    public private(set) var isBreakActive = false
+    public private(set) var samplesReadyForSync: [TripLocationSample] = []
 
-    @Published public private(set) var pickupDistanceMeters: Double?
-    @Published public private(set) var destinationDistanceMeters: Double?
-    @Published public private(set) var insidePickupGeofence = false
-    @Published public private(set) var insideDestinationGeofence = false
+    public private(set) var pickupDistanceMeters: Double?
+    public private(set) var destinationDistanceMeters: Double?
+    public private(set) var insidePickupGeofence = false
+    public private(set) var insideDestinationGeofence = false
 
     private let tripId: String
     private let pickupLocation: CLLocation?
     private let destinationLocation: CLLocation?
 
     private weak var locationManager: LocationManager?
-    private var locationSubscription: AnyCancellable?
     private var samplingTimer: Timer?
     private var syncTimer: Timer?
 
     private let maxBatchSize = 50
     private var syncRetryCount = 0
     private var isSyncing = false
+    private var syncRetryTask: Task<Void, Never>?
 
     // Hysteresis counters to avoid rapid toggling on GPS drift.
     private var pickupInsideHits = 0
@@ -67,11 +68,19 @@ public final class TripExecutionViewModel: ObservableObject {
     public func attachLocationManager(_ manager: LocationManager) {
         locationManager = manager
         print("[TripExecution] Attached LocationManager for trip \(tripId)")
-        locationSubscription = manager.$currentLocation
-            .compactMap { $0 }
-            .sink { [weak self] location in
-                self?.consume(location: location)
+        observeLocationUpdates()
+    }
+
+    private func observeLocationUpdates() {
+        Task { [weak self] in
+            while !Task.isCancelled {
+                if let location = self?.locationManager?.currentLocation {
+                    await self?.consume(location: location)
+                }
+                // Poll or wait for next change. Poll is easier than withObservationTracking loop for now.
+                try? await Task.sleep(for: .seconds(2))
             }
+        }
     }
 
     public var hasLocationPermission: Bool {
@@ -120,6 +129,8 @@ public final class TripExecutionViewModel: ObservableObject {
         samplingTimer = nil
         syncTimer?.invalidate()
         syncTimer = nil
+        syncRetryTask?.cancel()
+        syncRetryTask = nil
         locationManager?.stopUpdating()
         print("[TripExecution] Stopped location tracking for trip \(tripId)")
     }
@@ -201,6 +212,11 @@ public final class TripExecutionViewModel: ObservableObject {
 
     public func syncSamplesToSupabase() async {
         guard !isSyncing, !samplesReadyForSync.isEmpty else { return }
+        
+        // Cancel any pending retry task if we're starting a fresh sync attempt
+        syncRetryTask?.cancel()
+        syncRetryTask = nil
+        
         isSyncing = true
         
         let batch = Array(samplesReadyForSync.prefix(maxBatchSize))
@@ -216,6 +232,9 @@ public final class TripExecutionViewModel: ObservableObject {
             samplesReadyForSync.removeFirst(batch.count)
             syncRetryCount = 0
             isSyncing = false
+            syncRetryTask?.cancel()
+            syncRetryTask = nil
+            
             print("[TripSync] Successfully synced \(batch.count) samples. Remaining in queue: \(samplesReadyForSync.count)")
             
             // If there's more data, trigger another sync immediately
@@ -228,10 +247,12 @@ public final class TripExecutionViewModel: ObservableObject {
             let delay = min(Double(pow(2.0, Double(syncRetryCount))), 300.0) // Max 5 min delay
             print("[TripSync] Sync failed: \(error.localizedDescription). Retry count: \(syncRetryCount). Backing off for \(Int(delay))s")
             
-            // Schedule retry with exponential backoff
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                Task { [weak self] in
-                    await self?.syncSamplesToSupabase()
+            // Schedule retry with exponential backoff using a single Task token
+            syncRetryTask?.cancel()
+            syncRetryTask = Task {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                if !Task.isCancelled {
+                    await syncSamplesToSupabase()
                 }
             }
         }
