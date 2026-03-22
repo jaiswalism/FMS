@@ -99,6 +99,14 @@ public final class SafetyViewModel {
     // MARK: - Manual SOS (no crash flow)
 
     public func triggerManualSOS() {
+        // Cancel any in-flight impact delay to prevent overlapping flows
+        delayTask?.cancel()
+        delayTask = nil
+        cancelConfirmationTimer()
+        showSafetyConfirmation = false
+        crashService.clearImpact()
+        flowState = .idle
+
         isImpactDrivenSOS = false
         showSOSCountdown = true
     }
