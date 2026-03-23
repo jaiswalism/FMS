@@ -110,6 +110,12 @@ public struct VehicleDetailView: View {
                         Task { await viewModel.fetch(vehicleId: currentVehicle.id) }
                     }
                 )
+            case .trackLive:
+                if let trip = currentTrip {
+                    TripReplayView(trip: trip)
+                } else {
+                    Text("No active trip to track.")
+                }
             }
         }
         .task {
@@ -475,7 +481,9 @@ public struct VehicleDetailView: View {
     private var bottomActions: some View {
         HStack(spacing: 12) {
             Button {
-                // Track Live action
+                if currentTrip != nil {
+                    navTarget = .trackLive
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "location.fill")
@@ -488,9 +496,10 @@ public struct VehicleDetailView: View {
                 .foregroundColor(FMSTheme.obsidian)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(FMSTheme.amber)
+                .background(currentTrip != nil ? FMSTheme.amber : FMSTheme.textTertiary.opacity(0.3))
                 .cornerRadius(12)
             }
+            .disabled(currentTrip == nil)
             
             Button {
                 // Schedule Service action
@@ -746,6 +755,7 @@ enum DetailSectionTarget: String, Identifiable {
     case serviceHistory
     case incidents
     case documents
+    case trackLive
 
     var id: String { rawValue }
 }

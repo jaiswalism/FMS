@@ -8,6 +8,7 @@ import SwiftUI
 
 struct VehicleListCard: View {
     let vehicle: Vehicle
+    var onTrack: ((Vehicle) -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 0) {
@@ -71,19 +72,15 @@ struct VehicleListCard: View {
                 
                 // Action Buttons
                 HStack(spacing: 12) {
-                    if isTrackable {
-                        Button {
-                            // TODO: Wire tracking flow.
-                        } label: {
-                            trackLabel
-                        }
-                        .buttonStyle(.plain)
-                    } else {
+                    Button {
+                        onTrack?(vehicle)
+                    } label: {
                         trackLabel
-                            .opacity(0.6)
-                            .allowsHitTesting(false)
-                            .accessibilityHint("Tracking is unavailable.")
                     }
+                    .buttonStyle(.plain)
+                    .disabled(!isTrackable)
+                    .opacity(isTrackable ? 1.0 : 0.4)
+                    .accessibilityHint(isTrackable ? "Track this vehicle live" : "Tracking is unavailable — vehicle is not on a trip.")
                 }
                 .padding(.top, 4)
             }
@@ -154,7 +151,7 @@ struct VehicleListCard: View {
     }
     
     private var isTrackable: Bool {
-        false
+        normalizedStatus == "active"
     }
     
     private var trackLabel: some View {

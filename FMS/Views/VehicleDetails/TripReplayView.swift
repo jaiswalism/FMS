@@ -79,8 +79,11 @@ public struct TripReplayView: View {
             }
         }
         .task {
-            await vm.load(tripId: trip.id)
+            await vm.load(trip: trip)
             fitCameraToPath()
+        }
+        .onDisappear {
+            vm.stopLivePolling()
         }
     }
 
@@ -331,7 +334,7 @@ public struct TripReplayView: View {
                 .foregroundColor(FMSTheme.textSecondary)
                 .multilineTextAlignment(.center)
             Button("Retry") {
-                Task { await vm.load(tripId: trip.id) }
+                Task { await vm.load(trip: trip) }
             }
             .font(.system(size: 13, weight: .semibold))
             .foregroundColor(FMSTheme.obsidian)

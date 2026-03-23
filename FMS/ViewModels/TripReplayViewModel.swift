@@ -2,6 +2,7 @@ import Foundation
 import MapKit
 import Observation
 import Supabase
+import SwiftUI
 
 @Observable
 @MainActor
@@ -25,6 +26,9 @@ public final class TripReplayViewModel {
 
     // MARK: - Private
     private var playTimer: Timer? = nil
+    private var livePollTimer: Timer? = nil
+    private let livePollInterval: TimeInterval = 10.0
+    private var activeTripId: String? = nil
     /// Base interval between frames (seconds) at 1×.
     private let baseFrameInterval: TimeInterval = 0.08
     
@@ -90,7 +94,8 @@ public final class TripReplayViewModel {
 
     // MARK: - Fetch
 
-    public func load(tripId: String) async {
+    public func load(trip: Trip) async {
+        self.activeTripId = trip.id
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -99,7 +104,7 @@ public final class TripReplayViewModel {
             async let gpsFetch: [TripGPSLog] = SupabaseService.shared.client
                 .from("trip_gps_logs")
                 .select()
-                .eq("trip_id", value: tripId)
+                .eq("trip_id", value: trip.id)
                 .order("recorded_at", ascending: true)
                 .execute()
                 .value
@@ -107,7 +112,7 @@ public final class TripReplayViewModel {
             async let incidentFetch: [Incident] = SupabaseService.shared.client
                 .from("incidents")
                 .select()
-                .eq("trip_id", value: tripId)
+                .eq("trip_id", value: trip.id)
                 .order("created_at", ascending: true)
                 .execute()
                 .value
@@ -115,7 +120,7 @@ public final class TripReplayViewModel {
             async let breakFetch: [BreakLog] = SupabaseService.shared.client
                 .from("break_logs")
                 .select()
-                .eq("trip_id", value: tripId)
+                .eq("trip_id", value: trip.id)
                 .order("start_time", ascending: true)
                 .execute()
                 .value
@@ -125,6 +130,11 @@ public final class TripReplayViewModel {
             incidents = inc
             breakLogs = brk
             currentIndex = 0
+            
+            let status = trip.status?.lowercased() ?? ""
+            if status == "in_progress" || status == "ongoing" || status == "active" {
+                startLivePolling()
+            }
         } catch {
             errorMessage = error.localizedDescription
             print("[TripReplayViewModel] ❌ Load failed: \(error)")
@@ -188,6 +198,62 @@ public final class TripReplayViewModel {
     private func invalidateTimer() {
         playTimer?.invalidate()
         playTimer = nil
+    }
+
+    // MARK: - Live Polling (Active Trips)
+
+    private func startLivePolling() {
+        stopLivePolling()
+        livePollTimer = Timer.scheduledTimer(withTimeInterval: livePollInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.fetchNewPings()
+            }
+        }
+    }
+
+    public func stopLivePolling() {
+        livePollTimer?.invalidate()
+        livePollTimer = nil
+    }
+
+    private func fetchNewPings() async {
+        guard let tripId = activeTripId else { return }
+        do {
+            var query = SupabaseService.shared.client
+                .from("trip_gps_logs")
+                .select()
+                .eq("trip_id", value: tripId)
+
+            if let lastTime = gpsPoints.last?.recordedAt {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let dateStr = formatter.string(from: lastTime)
+                query = query.gt("recorded_at", value: dateStr)
+            }
+
+            let newPings: [TripGPSLog] = try await query
+                .order("recorded_at", ascending: true)
+                .execute()
+                .value
+
+            guard !newPings.isEmpty else { return }
+
+            print("[TripReplayViewModel] 📍 Polled \(newPings.count) new GPS pings.")
+            let wasAtEnd = currentIndex == (gpsPoints.count - 1)
+            gpsPoints.append(contentsOf: newPings)
+            
+            if wasAtEnd || currentIndex == 0 {
+                // Auto-advance if we were sitting at the end of the route (live tracking behavior)
+                // Or if it was previously empty/stuck at index 0.
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    seek(to: gpsPoints.count - 1)
+                }
+            }
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == -999 { return }
+            print("[TripReplayViewModel] Live poll failed: \(error)")
+        }
     }
 
     // MARK: - Helpers
