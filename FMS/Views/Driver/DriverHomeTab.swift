@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DriverHomeTab: View {
     @Bindable var viewModel: DriverDashboardViewModel
+    @Environment(BannerManager.self) private var bannerManager
     @State private var showPreTripInspection = false
     @State private var showPostTripInspection = false
     @State private var preTripInspectionCompleted = false
@@ -100,6 +101,18 @@ struct DriverHomeTab: View {
                         viewModel.endTrip()
                     }
                     postTripInspectionCompleted = false
+                }
+            }
+            .onChange(of: viewModel.breakLogViewModel.errorMessage) { _, msg in
+                if let msg {
+                    bannerManager.show(type: .error, message: msg)
+                    viewModel.breakLogViewModel.errorMessage = nil
+                }
+            }
+            .onChange(of: viewModel.errorMessage) { _, msg in
+                if let msg {
+                    bannerManager.show(type: .error, message: msg)
+                    viewModel.errorMessage = nil
                 }
             }
         }
