@@ -392,12 +392,14 @@ public struct OrderDetailView: View {
                     .background(FMSTheme.borderLight)
                 
                 VStack(spacing: 12) {
-                    if isOngoing, let trip = currentTrip {
+                    if let trip = currentTrip {
+                        let isTripOngoing = ["active", "in_progress", "in_transit"].contains(trip.status?.lowercased() ?? "")
+                        
                         NavigationLink(destination: TripReplayView(trip: trip)) {
                             HStack(spacing: 10) {
-                                Image(systemName: "location.fill")
+                                Image(systemName: isTripOngoing ? "location.fill" : "calendar")
                                     .font(.system(size: 15, weight: .bold))
-                                Text("Track Driver Live")
+                                Text(isTripOngoing ? "Track Driver Live" : "View Scheduled Route")
                                     .font(.system(size: 16, weight: .bold))
                             }
                             .foregroundColor(FMSTheme.obsidian)
@@ -554,12 +556,12 @@ public struct OrderDetailView: View {
             
             await MainActor.run { self.currentOrderStatus = orderResult.first?.status ?? order.status }
 
-            let activeStatuses = ["active", "in_progress", "in_transit"]
+            let relevantStatuses = ["active", "in_progress", "in_transit", "scheduled", "assigned", "pending"]
             let trips: [Trip] = try await SupabaseService.shared.client
                 .from("trips")
                 .select()
                 .eq("order_id", value: order.id)
-                .in("status", values: activeStatuses)
+                .in("status", values: relevantStatuses)
                 .execute()
                 .value
             

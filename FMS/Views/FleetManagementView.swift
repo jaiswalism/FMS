@@ -62,9 +62,13 @@ public struct FleetManagementView: View {
                         ScrollView {
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.filteredVehicles) { vehicle in
-                                    VehicleListCard(vehicle: vehicle, onTrack: { v in
-                                        Task { await fetchActiveTrip(for: v) }
-                                    })
+                                     VehicleListCard(
+                                        vehicle: vehicle,
+                                        onTrack: { v in
+                                            Task { await fetchActiveTrip(for: v) }
+                                        },
+                                        derivedStatus: viewModel.derivedStatus(for: vehicle)
+                                    )
                                         .contentShape(RoundedRectangle(cornerRadius: 14))
                                         .onTapGesture {
                                             selectedVehicle = vehicle
@@ -232,7 +236,7 @@ private extension FleetManagementView {
     func countForStatus(_ status: String) -> Int {
         let normalizedStatus = normalizeStatus(status)
         return vehiclesMatchingSearch()
-            .filter { normalizeStatus($0.status ?? "") == normalizedStatus }
+            .filter { normalizeStatus(viewModel.derivedStatus(for: $0)) == normalizedStatus }
             .count
     }
     

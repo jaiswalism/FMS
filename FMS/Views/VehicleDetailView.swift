@@ -30,6 +30,7 @@ public struct VehicleDetailView: View {
                 VStack(spacing: 20) {
                     headerBlock
                     currentTripSection
+                    scheduledTripsSection
                     pastTripsSection
                     serviceSection
                     incidentsSection
@@ -83,7 +84,7 @@ public struct VehicleDetailView: View {
             switch target {
             case .pastTrips:
                 PastTripsListView(
-                    trips: pastTrips,
+                    trips: viewModel.pastTrips,
                     isLoading: viewModel.isLoadingTrips,
                     errorMessage: viewModel.tripsErrorMessage
                 )
@@ -110,7 +111,11 @@ public struct VehicleDetailView: View {
                     }
                 )
             case .trackLive:
-                TripReplayView(trip: currentTrip!)
+                if let trip = viewModel.ongoingTrip {
+                    TripReplayView(trip: trip)
+                } else {
+                    Text("No ongoing trip to track.")
+                }
             }
         }
         .task {
@@ -205,10 +210,10 @@ public struct VehicleDetailView: View {
                         .foregroundColor(FMSTheme.textSecondary)
                 } else if let error = viewModel.tripsErrorMessage {
                     errorCard(text: "Unable to load current trip.\n\(error)")
-                } else if let trip = currentTrip {
+                } else if let trip = viewModel.ongoingTrip {
                     tripCardContent(trip)
                 } else {
-                    Text("No active trip.")
+                    Text("No ongoing trip.")
                         .font(.system(size: 14))
                         .foregroundColor(FMSTheme.textTertiary)
                 }
@@ -220,10 +225,30 @@ public struct VehicleDetailView: View {
         }
     }
     
+    private var scheduledTripsSection: some View {
+        Group {
+            if !viewModel.scheduledTrips.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Future Trips")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(FMSTheme.textPrimary)
+                    
+                    ForEach(viewModel.scheduledTrips) { trip in
+                        tripCardContent(trip)
+                    }
+                }
+                .padding(16)
+                .background(FMSTheme.cardBackground)
+                .cornerRadius(16)
+                .shadow(color: FMSTheme.shadowSmall, radius: 6, x: 0, y: 4)
+            }
+        }
+    }
+    
     private var pastTripsSection: some View {
         navigationCard(
             title: "Past Trips",
-            count: pastTrips.count,
+            count: viewModel.pastTrips.count,
             isLoading: viewModel.isLoadingTrips,
             target: .pastTrips
         )
@@ -476,7 +501,7 @@ public struct VehicleDetailView: View {
     private var bottomActions: some View {
         HStack(spacing: 12) {
             Button {
-                if currentTrip != nil {
+                if viewModel.ongoingTrip != nil {
                     navTarget = .trackLive
                 }
             } label: {
@@ -491,10 +516,10 @@ public struct VehicleDetailView: View {
                 .foregroundColor(FMSTheme.obsidian)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(currentTrip != nil ? FMSTheme.amber : FMSTheme.textTertiary.opacity(0.3))
+                .background(viewModel.ongoingTrip != nil ? FMSTheme.amber : FMSTheme.textTertiary.opacity(0.3))
                 .cornerRadius(12)
             }
-            .disabled(currentTrip == nil)
+            .disabled(viewModel.ongoingTrip == nil)
             
             Button {
                 // Schedule Service action
@@ -566,17 +591,17 @@ public struct VehicleDetailView: View {
     }
 
     private var vehicleStatusLabel: String {
-        let normalized = VehicleStatus.normalize(currentVehicle.status ?? "")
+        let normalized = VehicleStatus.normalize(viewModel.derivedStatus)
         switch normalized {
         case "active": return "On Trip"
         case "maintenance": return "Maintenance"
         case "inactive": return "In Yard"
-        default: return (currentVehicle.status ?? "Unknown").capitalized
+        default: return viewModel.derivedStatus.capitalized
         }
     }
     
     private var vehicleStatusBackground: Color {
-        let normalized = VehicleStatus.normalize(currentVehicle.status ?? "")
+        let normalized = VehicleStatus.normalize(viewModel.derivedStatus)
         switch normalized {
         case "active": return FMSTheme.alertGreen.opacity(0.15)
         case "maintenance": return FMSTheme.alertAmber.opacity(0.2)
@@ -586,7 +611,7 @@ public struct VehicleDetailView: View {
     }
     
     private var vehicleStatusTextColor: Color {
-        let normalized = VehicleStatus.normalize(currentVehicle.status ?? "")
+        let normalized = VehicleStatus.normalize(viewModel.derivedStatus)
         switch normalized {
         case "active": return FMSTheme.alertGreen
         case "maintenance": return FMSTheme.alertAmber
@@ -710,22 +735,6 @@ public struct VehicleDetailView: View {
         return Self.timeFormatter.string(from: date)
     }
     
-    private var currentTrip: Trip? {
-        viewModel.trips.first { trip in
-            if trip.endTime == nil { return true }
-            let status = trip.status?.lowercased() ?? ""
-            return status == "in_progress" || status == "ongoing" || status == "active"
-        }
-    }
-    
-    private var pastTrips: [Trip] {
-        if let currentTrip {
-            return viewModel.trips.filter { $0.id != currentTrip.id }
-        }
-        return viewModel.trips
-    }
-    
-
     private func humanize(_ value: String) -> String {
         SharedFormatting.humanize(value)
     }

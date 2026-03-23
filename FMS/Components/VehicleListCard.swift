@@ -9,6 +9,7 @@ import SwiftUI
 struct VehicleListCard: View {
     let vehicle: Vehicle
     var onTrack: ((Vehicle) -> Void)? = nil
+    var derivedStatus: String? = nil
     
     var body: some View {
         HStack(spacing: 0) {
@@ -139,7 +140,7 @@ struct VehicleListCard: View {
     }
 
     private var normalizedStatus: String {
-        VehicleStatus.normalize(cleanedStatus)
+        VehicleStatus.normalize(derivedStatus ?? vehicle.status ?? "")
     }
     
     private var cleanedStatus: String {
