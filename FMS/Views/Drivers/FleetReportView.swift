@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 public struct FleetReportView: View {
     @Environment(BannerManager.self) private var bannerManager
