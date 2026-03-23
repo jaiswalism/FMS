@@ -183,9 +183,7 @@ struct DriverHomeTab: View {
                     onLogBreak: {
                         if viewModel.breakLogViewModel.isOnBreak {
                             // End break directly — no sheet needed
-                            Task {
-                                try? await viewModel.breakLogViewModel.endBreak()
-                            }
+                            viewModel.breakLogViewModel.endBreak()
                         } else {
                             showBreakLog = true
                         }

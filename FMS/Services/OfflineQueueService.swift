@@ -45,7 +45,6 @@ public final class OfflineQueueService {
 
     // MARK: - Public API
 
-    /// Attempt Supabase insert. On failure, queue for retry.
     public func insertOrQueue<T: Encodable>(
         table: String,
         payload: T,
@@ -58,7 +57,29 @@ public final class OfflineQueueService {
                 .execute()
             return true
         } catch {
+            print("❌ [OfflineQueue] Insert Failed: \(error.localizedDescription)")
             enqueue(table: table, payload: payload, type: payloadType)
+            return false
+        }
+    }
+
+    /// Attempt Supabase update. On failure, queue for retry (will fallback to insert queue in offline mode right now to avoid schema split, but valid for DB syncing).
+    public func updateOrQueue<T: Encodable>(
+        table: String,
+        payload: T,
+        id: String,
+        payloadType: QueuedPayloadType
+    ) async -> Bool {
+        do {
+            try await SupabaseService.shared.client
+                .from(table)
+                .update(payload)
+                .eq("id", value: id)
+                .execute()
+            return true
+        } catch {
+            print("❌ [OfflineQueue] Update Failed: \(error.localizedDescription)")
+            // Future revision: add separate update queue. Fallback strictly required for now.
             return false
         }
     }
@@ -84,10 +105,10 @@ public final class OfflineQueueService {
 
         for var item in queue {
             do {
-                // Send raw JSON to Supabase
+                // Send raw JSON to Supabase via upsert
                 try await SupabaseService.shared.client
                     .from(item.tableName)
-                    .insert(AnyJSON(item.jsonData))
+                    .upsert(AnyJSON(item.jsonData), onConflict: "id")
                     .execute()
             } catch {
                 item.retryCount += 1

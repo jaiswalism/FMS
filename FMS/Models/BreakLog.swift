@@ -84,8 +84,6 @@ public struct BreakLogInsert: Codable {
     public var durationMinutes: Int?
     public var lat: Double?
     public var lng: Double?
-    public var endLat: Double?
-    public var endLng: Double?
     public var notes: String?
 
     public init(
@@ -98,8 +96,6 @@ public struct BreakLogInsert: Codable {
         durationMinutes: Int? = nil,
         lat: Double? = nil,
         lng: Double? = nil,
-        endLat: Double? = nil,
-        endLng: Double? = nil,
         notes: String? = nil
     ) {
         self.id = id
@@ -111,8 +107,6 @@ public struct BreakLogInsert: Codable {
         self.durationMinutes = durationMinutes
         self.lat = lat
         self.lng = lng
-        self.endLat = endLat
-        self.endLng = endLng
         self.notes = notes
     }
 
@@ -126,8 +120,6 @@ public struct BreakLogInsert: Codable {
         case durationMinutes = "duration_minutes"
         case lat
         case lng
-        case endLat = "end_lat"
-        case endLng = "end_lng"
         case notes
     }
 }

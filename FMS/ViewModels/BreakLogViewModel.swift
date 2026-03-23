@@ -3,34 +3,6 @@ import CoreLocation
 import Observation
 import Supabase
 
-// MARK: - Break Type
-
-public enum BreakType: String, CaseIterable, Identifiable, Codable {
-    case rest  = "rest"
-    case meal  = "meal"
-    case fuel  = "fuel"
-    case other = "other"
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .rest:  return "Rest"
-        case .meal:  return "Meal"
-        case .fuel:  return "Fuel Stop"
-        case .other: return "Other"
-        }
-    }
-
-    public var icon: String {
-        switch self {
-        case .rest:  return "bed.double.fill"
-        case .meal:  return "fork.knife"
-        case .fuel:  return "fuelpump.fill"
-        case .other: return "ellipsis.circle.fill"
-        }
-    }
-}
 
 @MainActor
 @Observable
@@ -43,15 +15,16 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
     public var notes: String = ""
     public var currentBreakStartTime: Date?
     public var currentBreakElapsedSeconds: TimeInterval = 0
+    public var currentBreakId: String?
     public var breakLogs: [BreakLog] = []
     public var showMinDurationWarning: Bool = false
     public var errorMessage: String? = nil
 
-    // MARK: - Private
+    // MARK: - Identity
 
-    private let driverId: String
-    private let tripId: String
-    private let vehicleId: String
+    public var driverId: String
+    public var tripId: String
+    public var vehicleId: String
     private var timer: Timer?
     private var locationManager: CLLocationManager?
     private var startLocation: CLLocation?
@@ -91,12 +64,35 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     public func startBreak(driverId: String? = nil, tripId: String? = nil, lat: Double? = nil, lng: Double? = nil) {
         guard !isOnBreak else { return }
+        
+        if let dId = driverId { self.driverId = dId }
+        if let tId = tripId { self.tripId = tId }
+        
         isOnBreak = true
-        currentBreakStartTime = Date()
+        let start = Date()
+        currentBreakStartTime = start
         currentBreakElapsedSeconds = 0
+        currentBreakId = UUID().uuidString
         showMinDurationWarning = false
         locationManager?.requestLocation()
         startLocation = currentLocation ?? locationManager?.location
+
+        // Push outgoing break immediately as an offline insert payload
+        let initialLog = BreakLog(
+            id: currentBreakId!,
+            tripId: self.tripId.isEmpty ? nil : self.tripId,
+            driverId: self.driverId.isEmpty ? nil : self.driverId,
+            breakType: selectedBreakType.rawValue,
+            startTime: start,
+            endTime: nil,
+            durationMinutes: nil,
+            lat: startLocation?.coordinate.latitude ?? lat,
+            lng: startLocation?.coordinate.longitude ?? lng,
+            endLat: nil,
+            endLng: nil,
+            notes: notes.isEmpty ? nil : notes
+        )
+        Task { await saveBreakLog(initialLog) }
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -124,7 +120,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         }
 
         let log = BreakLog(
-            id: UUID().uuidString,
+            id: currentBreakId ?? UUID().uuidString,
             tripId: self.tripId.isEmpty ? nil : self.tripId,
             driverId: self.driverId.isEmpty ? nil : self.driverId,
             breakType: selectedBreakType.rawValue,
@@ -133,18 +129,20 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
             durationMinutes: max(1, durationMinutes),
             lat: startLocation?.coordinate.latitude,
             lng: startLocation?.coordinate.longitude,
-            endLat: endLocation?.coordinate.latitude,
-            endLng: endLocation?.coordinate.longitude,
+            endLat: endLocation?.coordinate.latitude ?? lat,
+            endLng: endLocation?.coordinate.longitude ?? lng,
             notes: notes.isEmpty ? nil : notes
         )
 
+        breakLogs.removeAll(where: { $0.id == log.id })
         breakLogs.insert(log, at: 0)
         currentBreakStartTime = nil
+        currentBreakId = nil
         currentBreakElapsedSeconds = 0
         notes = ""
 
         Task {
-            await saveBreakLog(log)
+            await saveBreakLog(log, isUpdate: true)
         }
     }
 
@@ -194,7 +192,9 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
             if let openBreak = breaks.first(where: { $0.isOngoing }) {
                 self.isOnBreak = true
                 self.currentBreakStartTime = openBreak.startTime
-                self.selectedBreakType = BreakType(rawValue: openBreak.breakType ?? "rest") ?? .rest
+                self.currentBreakId = openBreak.id
+                // Use default .rest if main upstream removed .BreakType enum constructor
+                self.selectedBreakType = .rest
                 
                 // Resume elapsed counting via standard start dispatch
                 timer?.invalidate()
@@ -213,27 +213,42 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Persistence
 
-    private func saveBreakLog(_ log: BreakLog) async {
-        let insert = BreakLogInsert(
-            id: log.id,
-            tripId: log.tripId,
-            driverId: log.driverId,
-            breakType: log.breakType,
-            startTime: log.startTime,
-            endTime: log.endTime,
-            durationMinutes: log.durationMinutes,
-            lat: log.lat,
-            lng: log.lng,
-            endLat: log.endLat,
-            endLng: log.endLng,
-            notes: log.notes
-        )
-
-        _ = await OfflineQueueService.shared.insertOrQueue(
-            table: "break_logs",
-            payload: insert,
-            payloadType: .breakLog
-        )
+    private func saveBreakLog(_ log: BreakLog, isUpdate: Bool = false) async {
+        if isUpdate {
+            struct BreakLogUpdate: Codable {
+                let end_time: Date?
+                let duration_minutes: Int?
+            }
+            let updatePayload = BreakLogUpdate(
+                end_time: log.endTime,
+                duration_minutes: log.durationMinutes
+            )
+            _ = await OfflineQueueService.shared.updateOrQueue(
+                table: "break_logs",
+                payload: updatePayload,
+                id: log.id,
+                payloadType: .breakLog
+            )
+        } else {
+            let insert = BreakLogInsert(
+                id: log.id,
+                tripId: log.tripId,
+                driverId: log.driverId,
+                breakType: log.breakType,
+                startTime: log.startTime,
+                endTime: log.endTime,
+                durationMinutes: log.durationMinutes,
+                lat: log.lat,
+                lng: log.lng,
+                notes: log.notes
+            )
+            
+            _ = await OfflineQueueService.shared.insertOrQueue(
+                table: "break_logs",
+                payload: insert,
+                payloadType: .breakLog
+            )
+        }
     }
 
     // MARK: - Location

@@ -8,7 +8,7 @@ struct BreakHistoryRow: View {
         BreakType(rawValue: breakLog.breakType ?? "other")?.icon ?? "ellipsis.circle.fill"
     }
     private var typeName: String {
-        BreakType(rawValue: breakLog.breakType ?? "other")?.displayName ?? "Break"
+        BreakType(rawValue: breakLog.breakType ?? "Other")?.rawValue ?? "Break"
     }
 
     var body: some View {

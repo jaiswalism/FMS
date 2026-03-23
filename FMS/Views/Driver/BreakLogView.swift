@@ -16,7 +16,7 @@ struct BreakLogView: View {
                     notesSection
                     submitButton
 
-                    if !vm.loggedBreaks.isEmpty || vm.activeBreak != nil {
+                    if !vm.breakLogs.isEmpty || vm.isOnBreak {
                         historySection
                     }
                 }
@@ -51,15 +51,15 @@ struct BreakLogView: View {
                 GridItem(.flexible())
             ], spacing: 10) {
                 ForEach(BreakType.allCases) { type in
-                    let isSelected = vm.selectedType == type
+                    let isSelected = vm.selectedBreakType == type
 
                     Button {
-                        vm.selectedType = type
+                        vm.selectedBreakType = type
                     } label: {
                         VStack(spacing: 6) {
                             Image(systemName: type.icon)
                                 .font(.system(size: 20, weight: .semibold))
-                            Text(type.displayName)
+                            Text(type.rawValue)
                                 .font(.system(size: 10, weight: .semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
@@ -114,19 +114,13 @@ struct BreakLogView: View {
             startBreak()
         } label: {
             HStack(spacing: 8) {
-                if vm.isSubmitting {
-                    ProgressView().tint(FMSTheme.obsidian)
-                } else {
-                    Image(systemName: "cup.and.saucer.fill")
-                        .font(.system(size: 14, weight: .bold))
-                }
+                Image(systemName: "cup.and.saucer.fill")
+                    .font(.system(size: 14, weight: .bold))
                 Text("Start Break")
                     .font(.headline.weight(.bold))
             }
         }
         .buttonStyle(.fmsPrimary)
-        .disabled(vm.isSubmitting)
-        .opacity(vm.isSubmitting ? 0.7 : 1)
     }
 
     // MARK: - Break History
@@ -141,11 +135,12 @@ struct BreakLogView: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(FMSTheme.textPrimary)
 
-            if let active = vm.activeBreak {
-                BreakHistoryRow(breakLog: active)
+            if vm.isOnBreak, let start = vm.currentBreakStartTime {
+                let ongoingLog = BreakLog(id: "ongoing", tripId: tripId, driverId: driverId, breakType: vm.selectedBreakType.rawValue, startTime: start, endTime: nil, durationMinutes: nil, lat: nil, lng: nil, endLat: nil, endLng: nil, notes: vm.notes.isEmpty ? nil : vm.notes)
+                BreakHistoryRow(breakLog: ongoingLog)
             }
 
-            ForEach(vm.loggedBreaks) { log in
+            ForEach(vm.breakLogs) { log in
                 BreakHistoryRow(breakLog: log)
             }
         }
@@ -154,18 +149,8 @@ struct BreakLogView: View {
     // MARK: - Logic
 
     private func startBreak() {
-        Task {
-            do {
-                try await vm.startBreak(driverId: driverId, tripId: tripId)
-                await MainActor.run {
-                    bannerManager.show(type: .success, message: "Break started. Tap 'End Break' when you're done.")
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    bannerManager.show(type: .error, message: "Couldn't start break: \(error.localizedDescription)")
-                }
-            }
-        }
+        vm.startBreak(driverId: driverId, tripId: tripId)
+        bannerManager.show(type: .success, message: "Break started. Tap 'End Break' when you're done.")
+        dismiss()
     }
 }
