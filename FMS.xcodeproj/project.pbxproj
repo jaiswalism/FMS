@@ -285,6 +285,7 @@
 				DEVELOPMENT_TEAM = 72B76SWRDS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+
 				INFOPLIST_KEY_CFBundleDisplayName = FleetPro;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used to scan driver's licenses, fuel receipts, and capture issue report photos.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "FleetPro tracks driver location throughout the trip to power live route visibility and geofence-based pickup and delivery verification.";
@@ -326,6 +327,7 @@
 				DEVELOPMENT_TEAM = 72B76SWRDS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+
 				INFOPLIST_KEY_CFBundleDisplayName = FleetPro;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is used to scan driver's licenses, fuel receipts, and capture issue report photos.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "FleetPro tracks driver location throughout the trip to power live route visibility and geofence-based pickup and delivery verification.";

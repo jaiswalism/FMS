@@ -4,6 +4,8 @@ struct DriverSafetyTab: View {
     @Bindable var safetyViewModel: SafetyViewModel
     @Bindable var breakLogViewModel: BreakLogViewModel
     let hasActiveTrip: Bool
+    let driverId: String
+    let tripId: String
 
     var body: some View {
         NavigationStack {
@@ -59,7 +61,9 @@ struct DriverSafetyTab: View {
     private var breakLoggingSection: some View {
         BreakLoggingView(
             viewModel: breakLogViewModel,
-            drivingTimer: safetyViewModel.drivingTimer
+            drivingTimer: safetyViewModel.drivingTimer,
+            driverId: driverId,
+            tripId: tripId
         )
     }
 

@@ -122,9 +122,12 @@ public struct NewTripAssignmentView: View {
                     shipmentCard
                 }
 
-                Spacer().frame(height: 40)
+                Spacer().frame(height: 140)
             }
             .padding(16)
+        }
+        .overlay(alignment: .bottom) {
+            bottomStickyButton
         }
         .background(FMSTheme.backgroundPrimary.ignoresSafeArea())
         .navigationTitle("Trip Assignment")
@@ -132,9 +135,6 @@ public struct NewTripAssignmentView: View {
         .toolbar(.hidden, for: .tabBar)
         .task {
             await fetchTripVehicle()
-        }
-        .safeAreaInset(edge: .bottom) {
-            bottomStickyButton
         }
         .sheet(isPresented: $showIssueReport) {
             IssueReportView(viewModel: viewModel)
@@ -505,6 +505,20 @@ public struct NewTripAssignmentView: View {
 
     private func formatDateTime(_ date: Date) -> String { Self.dateTimeFormatter.string(from: date) }
 
+    private struct OrderFetchResult: Codable {
+        let orderNumber: String?
+        let waypoints: [Waypoint]?
+        let requestedPickupAt: Date?
+        let requestedDeliveryAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case orderNumber = "order_number"
+            case waypoints
+            case requestedPickupAt = "requested_pickup_at"
+            case requestedDeliveryAt = "requested_delivery_at"
+        }
+    }
+
     // MARK: - Fetch vehicle, order info & waypoints
     private func fetchTripVehicle() async {
         if let vehicleId = trip.vehicleId {
@@ -523,8 +537,9 @@ public struct NewTripAssignmentView: View {
 
         if let orderId = trip.orderId {
             do {
-                let rows: [Order] = try await SupabaseService.shared.client
-                    .from("orders").select("*").eq("id", value: orderId).execute().value
+                let response = try await SupabaseService.shared.client
+                    .from("orders").select("order_number, waypoints, requested_pickup_at, requested_delivery_at").eq("id", value: orderId).execute()
+                let rows = try JSONDecoder.supabase().decode([OrderFetchResult].self, from: response.data)
                 if let order = rows.first {
                     await MainActor.run {
                         orderNumber    = order.orderNumber

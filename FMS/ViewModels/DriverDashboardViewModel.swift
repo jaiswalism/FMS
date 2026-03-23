@@ -58,6 +58,9 @@ public final class DriverDashboardViewModel {
     public var issueReports: [IssueReport] = []
     public var errorMessage: String? = nil
 
+    // MARK: - Break Logging
+    public var breakLogViewModel: BreakLogViewModel = BreakLogViewModel()
+
     // MARK: - Computed
     public var hasActiveTrip: Bool { activeTrip != nil }
     public var currentJob: Trip? { activeTrip ?? upcomingTrips.first }
@@ -150,6 +153,9 @@ public final class DriverDashboardViewModel {
                     phone: p.phone ?? "N/A",
                     availabilityStatus: currentStatus
                 )
+                
+                // Fetch break logs explicitly for this driver to populate history and resume any active breaks
+                await self.breakLogViewModel.loadBreaks(driverId: currentUserId)
             }
 
             let allTrips: [Trip] = try await SupabaseService.shared.client

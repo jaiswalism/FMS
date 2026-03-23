@@ -70,48 +70,59 @@ public struct MapCard: View {
     }
     
     public var body: some View {
-        Map(position: $position) {
-            // Draw the calculated driving routes connecting the stops
-            ForEach(Array(routes.enumerated()), id: \.offset) { _, route in
-                MapPolyline(route.polyline)
-                    .stroke(FMSTheme.amber, lineWidth: 5)
-            }
-            
-            // Render annotations for each stop
-            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
-                Annotation(stop.title, coordinate: stop.coordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(index == 0 || index == 1 ? FMSTheme.amber : FMSTheme.cardBackground)
-                            .frame(width: 28, height: 28)
-                            .shadow(radius: 2, y: 1)
-                        
-                        Text("\(index + 1)")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundColor(index == 0 || index == 1 ? .black : FMSTheme.textPrimary)
+        ZStack {
+            Map(position: $position) {
+                // Draw the calculated driving routes connecting the stops
+                ForEach(Array(routes.enumerated()), id: \.offset) { _, route in
+                    MapPolyline(route.polyline)
+                        .stroke(FMSTheme.amber, lineWidth: 5)
+                }
+                
+                // Render annotations for each stop
+                ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
+                    Annotation(stop.title, coordinate: stop.coordinate) {
+                        ZStack {
+                            Circle()
+                                .fill(index == 0 || index == 1 ? FMSTheme.amber : FMSTheme.cardBackground)
+                                .frame(width: 28, height: 28)
+                                .shadow(radius: 2, y: 1)
+                            
+                            Text("\(index + 1)")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundColor(index == 0 || index == 1 ? .black : FMSTheme.textPrimary)
+                        }
                     }
                 }
             }
-        }
-        .mapStyle(.standard(elevation: .flat))
-        .mapControls {
-            MapCompass()
-            MapScaleView()
-            MapPitchToggle()
-        }
-        .overlay(alignment: .topTrailing) {
+            .mapStyle(.standard(elevation: .flat))
+            .scrollDisabled(true)
+            .mapControls {
+                MapCompass()
+                MapScaleView()
+            }
+
+            // Navigate button overlay
             if let onNavigate = onNavigate {
-                Button(action: onNavigate) {
-                    Image(systemName: "map.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(FMSTheme.amber, FMSTheme.cardBackground)
-                        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: onNavigate) {
+                            Image(systemName: "map.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(FMSTheme.amber, FMSTheme.cardBackground)
+                                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                        .accessibilityLabel("Open map")
+                        .accessibilityHint("Opens Apple Maps with the route pre-populated")
+                        .padding(12)
+                    }
+                    Spacer()
                 }
-                .accessibilityLabel("Open map")
-                .accessibilityHint("Opens Apple Maps with the route pre-populated")
-                .padding(12)
             }
         }
+        // Frame on the ZStack — deterministic layout, prevents Map from reporting
+        // infinite height to the parent ScrollView through the UIKit bridge
+        .frame(height: 240)
         .onAppear {
             position = mapCameraPosition
         }

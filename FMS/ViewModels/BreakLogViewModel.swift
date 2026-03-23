@@ -3,6 +3,7 @@ import CoreLocation
 import Observation
 import Supabase
 
+
 @MainActor
 @Observable
 public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
@@ -11,16 +12,20 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     public var isOnBreak: Bool = false
     public var selectedBreakType: BreakType = .rest
+    public var notes: String = ""
     public var currentBreakStartTime: Date?
     public var currentBreakElapsedSeconds: TimeInterval = 0
+    public var currentBreakId: String?
     public var breakLogs: [BreakLog] = []
     public var showMinDurationWarning: Bool = false
+    public var errorMessage: String? = nil
+    private var isSubmitting: Bool = false
 
-    // MARK: - Private
+    // MARK: - Identity
 
-    private let driverId: String
-    private let tripId: String
-    private let vehicleId: String
+    public var driverId: String
+    public var tripId: String
+    public var vehicleId: String
     private var timer: Timer?
     private var locationManager: CLLocationManager?
     private var startLocation: CLLocation?
@@ -38,6 +43,15 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         setupLocationManager()
     }
 
+    // Default init for compatibility with standard declarations where values are not yet known
+    public override init() {
+        self.driverId = ""
+        self.tripId = ""
+        self.vehicleId = ""
+        super.init()
+        setupLocationManager()
+    }
+
     // MARK: - Formatted
 
     public var formattedElapsed: String {
@@ -49,14 +63,41 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Public API
 
-    public func startBreak() {
-        guard !isOnBreak else { return }
+    public func startBreak(driverId: String? = nil, tripId: String? = nil, lat: Double? = nil, lng: Double? = nil) {
+        guard !isOnBreak && !isSubmitting else { return }
+        isSubmitting = true
+        
+        if let dId = driverId { self.driverId = dId }
+        if let tId = tripId { self.tripId = tId }
+        
         isOnBreak = true
-        currentBreakStartTime = Date()
+        let start = Date()
+        currentBreakStartTime = start
         currentBreakElapsedSeconds = 0
+        currentBreakId = UUID().uuidString
         showMinDurationWarning = false
         locationManager?.requestLocation()
         startLocation = currentLocation ?? locationManager?.location
+
+        // Push outgoing break immediately as an offline insert payload
+        let initialLog = BreakLog(
+            id: currentBreakId!,
+            tripId: self.tripId.isEmpty ? nil : self.tripId,
+            driverId: self.driverId.isEmpty ? nil : self.driverId,
+            breakType: selectedBreakType.rawValue,
+            startTime: start,
+            endTime: nil,
+            durationMinutes: nil,
+            lat: startLocation?.coordinate.latitude ?? lat,
+            lng: startLocation?.coordinate.longitude ?? lng,
+            endLat: nil,
+            endLng: nil,
+            notes: notes.isEmpty ? nil : notes
+        )
+        Task {
+            await saveBreakLog(initialLog)
+            isSubmitting = false
+        }
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -67,8 +108,9 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    public func endBreak() {
-        guard isOnBreak, let startTime = currentBreakStartTime else { return }
+    public func endBreak(lat: Double? = nil, lng: Double? = nil) {
+        guard isOnBreak && !isSubmitting, let startTime = currentBreakStartTime else { return }
+        isSubmitting = true
         timer?.invalidate()
         timer = nil
         isOnBreak = false
@@ -84,25 +126,30 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
         }
 
         let log = BreakLog(
-            id: UUID().uuidString,
-            tripId: tripId,
-            driverId: driverId,
+            id: currentBreakId ?? UUID().uuidString,
+            tripId: self.tripId.isEmpty ? nil : self.tripId,
+            driverId: self.driverId.isEmpty ? nil : self.driverId,
             breakType: selectedBreakType.rawValue,
             startTime: startTime,
             endTime: endTime,
             durationMinutes: max(1, durationMinutes),
             lat: startLocation?.coordinate.latitude,
             lng: startLocation?.coordinate.longitude,
-            endLat: endLocation?.coordinate.latitude,
-            endLng: endLocation?.coordinate.longitude
+            endLat: endLocation?.coordinate.latitude ?? lat,
+            endLng: endLocation?.coordinate.longitude ?? lng,
+            notes: notes.isEmpty ? nil : notes
         )
 
+        breakLogs.removeAll(where: { $0.id == log.id })
         breakLogs.insert(log, at: 0)
         currentBreakStartTime = nil
+        currentBreakId = nil
         currentBreakElapsedSeconds = 0
+        notes = ""
 
         Task {
-            await saveBreakLog(log)
+            await saveBreakLog(log, isUpdate: true)
+            isSubmitting = false
         }
     }
 
@@ -111,6 +158,7 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
     public func fetchBreakHistory() {
         Task {
             do {
+                guard !tripId.isEmpty else { return }
                 let response = try await SupabaseService.shared.client
                     .from("break_logs")
                     .select()
@@ -128,33 +176,103 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
                     ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast)
                 }
             } catch {
-                // Will show whatever is in memory
+                print("⚠️ [BreakLogViewModel] Failed to load breaks (silent fallback): \(error)")
+                self.errorMessage = "Failed to fetch break history: \(error.localizedDescription)"
             }
+        }
+    }
+    
+    /// Loads breaks by driver across trips (Crash Recovery endpoint)
+    public func loadBreaks(driverId: String) async {
+        do {
+            let response = try await SupabaseService.shared.client
+                .from("break_logs")
+                .select()
+                .eq("driver_id", value: driverId)
+                .order("start_time", ascending: false)
+                .limit(50)
+                .execute()
+
+            let breaks = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
+            self.breakLogs = breaks.filter { !$0.isOngoing }
+            
+            if let openBreak = breaks.first(where: { $0.isOngoing }) {
+                self.isOnBreak = true
+                self.currentBreakStartTime = openBreak.startTime
+                self.currentBreakId = openBreak.id
+                // Restore actual break type from persisted record, fall back to .rest
+                if let storedType = openBreak.breakType, let breakType = BreakType(rawValue: storedType) {
+                    self.selectedBreakType = breakType
+                } else {
+                    self.selectedBreakType = .rest
+                }
+                
+                // Resume elapsed counting via standard start dispatch
+                timer?.invalidate()
+                timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, let start = self.currentBreakStartTime else { return }
+                        self.currentBreakElapsedSeconds = Date().timeIntervalSince(start)
+                    }
+                }
+            } else {
+                // Server confirms no ongoing break — clear any stale local state
+                if isOnBreak {
+                    timer?.invalidate()
+                    timer = nil
+                    isOnBreak = false
+                    currentBreakStartTime = nil
+                    currentBreakId = nil
+                    currentBreakElapsedSeconds = 0
+                    selectedBreakType = .rest
+                }
+            }
+        } catch {
+            print("⚠️ [BreakLogViewModel] Failed to load driver breaks: \(error)")
+            self.errorMessage = "Failed to load breaks: \(error.localizedDescription)"
         }
     }
 
     // MARK: - Persistence
 
-    private func saveBreakLog(_ log: BreakLog) async {
-        let insert = BreakLogInsert(
-            id: log.id,
-            tripId: log.tripId,
-            driverId: log.driverId,
-            breakType: log.breakType,
-            startTime: log.startTime,
-            endTime: log.endTime,
-            durationMinutes: log.durationMinutes,
-            lat: log.lat,
-            lng: log.lng,
-            endLat: log.endLat,
-            endLng: log.endLng
-        )
-
-        _ = await OfflineQueueService.shared.insertOrQueue(
-            table: "break_logs",
-            payload: insert,
-            payloadType: .breakLog
-        )
+    private func saveBreakLog(_ log: BreakLog, isUpdate: Bool = false) async {
+        if isUpdate {
+            struct BreakLogUpdate: Codable {
+                let end_time: Date?
+                let duration_minutes: Int?
+                let notes: String?
+            }
+            let updatePayload = BreakLogUpdate(
+                end_time: log.endTime,
+                duration_minutes: log.durationMinutes,
+                notes: log.notes
+            )
+            _ = await OfflineQueueService.shared.updateOrQueue(
+                table: "break_logs",
+                payload: updatePayload,
+                id: log.id,
+                payloadType: .breakLog
+            )
+        } else {
+            let insert = BreakLogInsert(
+                id: log.id,
+                tripId: log.tripId,
+                driverId: log.driverId,
+                breakType: log.breakType,
+                startTime: log.startTime,
+                endTime: log.endTime,
+                durationMinutes: log.durationMinutes,
+                lat: log.lat,
+                lng: log.lng,
+                notes: log.notes
+            )
+            
+            _ = await OfflineQueueService.shared.insertOrQueue(
+                table: "break_logs",
+                payload: insert,
+                payloadType: .breakLog
+            )
+        }
     }
 
     // MARK: - Location

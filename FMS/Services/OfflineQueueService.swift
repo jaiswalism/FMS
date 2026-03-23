@@ -17,14 +17,17 @@ public struct QueuedPayload: Codable, Identifiable {
     public let jsonData: Data
     public let createdAt: Date
     public var retryCount: Int
+    /// For update payloads: the DB row id to patch. nil means this is an insert.
+    public let recordId: String?
 
-    public init(type: QueuedPayloadType, tableName: String, jsonData: Data) {
+    public init(type: QueuedPayloadType, tableName: String, jsonData: Data, recordId: String? = nil) {
         self.id = UUID().uuidString
         self.type = type
         self.tableName = tableName
         self.jsonData = jsonData
         self.createdAt = Date()
         self.retryCount = 0
+        self.recordId = recordId
     }
 }
 
@@ -45,7 +48,6 @@ public final class OfflineQueueService {
 
     // MARK: - Public API
 
-    /// Attempt Supabase insert. On failure, queue for retry.
     public func insertOrQueue<T: Encodable>(
         table: String,
         payload: T,
@@ -58,17 +60,39 @@ public final class OfflineQueueService {
                 .execute()
             return true
         } catch {
+            print("❌ [OfflineQueue] Insert Failed: \(error.localizedDescription)")
             enqueue(table: table, payload: payload, type: payloadType)
             return false
         }
     }
 
+    /// Attempt Supabase update. On failure, queue the payload for retry via processQueue.
+    public func updateOrQueue<T: Encodable>(
+        table: String,
+        payload: T,
+        id: String,
+        payloadType: QueuedPayloadType
+    ) async -> Bool {
+        do {
+            try await SupabaseService.shared.client
+                .from(table)
+                .update(payload)
+                .eq("id", value: id)
+                .execute()
+            return true
+        } catch {
+            print("❌ [OfflineQueue] Update Failed — queuing for retry: \(error.localizedDescription)")
+            enqueue(table: table, payload: payload, type: payloadType, recordId: id)
+            return false
+        }
+    }
+
     /// Queue a payload directly (without attempting insert first).
-    public func enqueue<T: Encodable>(table: String, payload: T, type: QueuedPayloadType) {
+    public func enqueue<T: Encodable>(table: String, payload: T, type: QueuedPayloadType, recordId: String? = nil) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         guard let jsonData = try? encoder.encode(payload) else { return }
-        let queued = QueuedPayload(type: type, tableName: table, jsonData: jsonData)
+        let queued = QueuedPayload(type: type, tableName: table, jsonData: jsonData, recordId: recordId)
         var queue = loadQueue()
         queue.append(queued)
         saveQueue(queue)
@@ -84,11 +108,20 @@ public final class OfflineQueueService {
 
         for var item in queue {
             do {
-                // Send raw JSON to Supabase
-                try await SupabaseService.shared.client
-                    .from(item.tableName)
-                    .insert(AnyJSON(item.jsonData))
-                    .execute()
+                if let recordId = item.recordId {
+                    // This was a failed update — replay as PATCH using the original row id
+                    try await SupabaseService.shared.client
+                        .from(item.tableName)
+                        .update(AnyJSON(item.jsonData))
+                        .eq("id", value: recordId)
+                        .execute()
+                } else {
+                    // This was a failed insert — replay as INSERT
+                    try await SupabaseService.shared.client
+                        .from(item.tableName)
+                        .insert(AnyJSON(item.jsonData))
+                        .execute()
+                }
             } catch {
                 item.retryCount += 1
                 if item.retryCount < maxRetries {

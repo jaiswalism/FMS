@@ -3,6 +3,8 @@ import SwiftUI
 struct BreakLoggingView: View {
     @Bindable var viewModel: BreakLogViewModel
     let drivingTimer: DrivingTimerManager
+    let driverId: String
+    let tripId: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -75,7 +77,8 @@ struct BreakLoggingView: View {
             }
 
             Button {
-                viewModel.startBreak()
+                viewModel.startBreak(driverId: driverId.isEmpty ? nil : driverId,
+                                     tripId: tripId.isEmpty ? nil : tripId)
                 drivingTimer.startBreak()
             } label: {
                 HStack(spacing: 8) {

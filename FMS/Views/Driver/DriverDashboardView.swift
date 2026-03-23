@@ -9,118 +9,103 @@ public struct DriverDashboardView: View {
     public init() {}
 
     public var body: some View {
-        ZStack {
-            FMSTabShell {
-                FMSTabItem(id: "home", title: "Home", icon: "house.fill") {
-                    DriverHomeTab(viewModel: viewModel)
-                }
-
-                FMSTabItem(id: "safety", title: "Safety", icon: "checkmark.shield.fill") {
-                    DriverSafetyTab(
-                        safetyViewModel: safetyViewModel,
-                        breakLogViewModel: currentBreakLogViewModel,
-                        hasActiveTrip: viewModel.hasActiveTrip
-                    )
-                }
-
-                FMSTabItem(id: "trips", title: "Trips", icon: "map.fill") {
-                    DriverTripsTab(viewModel: viewModel)
-                }
+        FMSTabShell {
+            FMSTabItem(id: "home", title: "Home", icon: "house.fill") {
+                DriverHomeTab(viewModel: viewModel)
             }
 
-            // Floating SOS Button
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    SOSFloatingButton {
-                        safetyViewModel.triggerManualSOS()
-                    }
-                    .padding(.trailing, 20)
-                }
-                .padding(.bottom, 90)
+            FMSTabItem(id: "safety", title: "Safety", icon: "checkmark.shield.fill") {
+                DriverSafetyTab(
+                    safetyViewModel: safetyViewModel,
+                    breakLogViewModel: currentBreakLogViewModel,
+                    hasActiveTrip: viewModel.hasActiveTrip,
+                    driverId: viewModel.driver.id,
+                    tripId: viewModel.activeTrip?.id ?? ""
+                )
             }
 
-            // Break Reminder Banner (top)
+            FMSTabItem(id: "trips", title: "Trips", icon: "map.fill") {
+                DriverTripsTab(viewModel: viewModel)
+            }
+        }
+        // Floating SOS Button — overlay so no spacers eat scroll gestures
+        .overlay(alignment: .bottomTrailing) {
+            SOSFloatingButton {
+                safetyViewModel.triggerManualSOS()
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 90)
+        }
+        // Break Reminder Banner (top)
+        .overlay(alignment: .top) {
             if safetyViewModel.drivingTimer.breakReminderLevel != .none
                 && !safetyViewModel.drivingTimer.breakReminderDismissed {
-                VStack {
-                    BreakReminderBannerView(
-                        level: safetyViewModel.drivingTimer.breakReminderLevel,
-                        drivingTime: safetyViewModel.drivingTimer.formattedDrivingTime,
-                        onDismiss: {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                safetyViewModel.drivingTimer.dismissBreakReminder()
-                            }
-                            // If warning or critical, show bottom sheet after dismiss
-                        },
-                        onStartBreak: {
-                            startBreakFromReminder()
+                BreakReminderBannerView(
+                    level: safetyViewModel.drivingTimer.breakReminderLevel,
+                    drivingTime: safetyViewModel.drivingTimer.formattedDrivingTime,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            safetyViewModel.drivingTimer.dismissBreakReminder()
                         }
-                    )
-                    .padding(.top, 8)
-                    Spacer()
-                }
+                    },
+                    onStartBreak: {
+                        startBreakFromReminder()
+                    }
+                )
+                .padding(.top, 8)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: safetyViewModel.drivingTimer.breakReminderLevel)
             }
-
-            // Break Reminder Bottom Sheet (escalated)
+        }
+        // Break Reminder Bottom Sheet (escalated)
+        .overlay(alignment: .bottom) {
             if safetyViewModel.drivingTimer.breakReminderDismissed
                 && safetyViewModel.drivingTimer.breakReminderLevel >= .warning {
-                VStack {
-                    Spacer()
-                    BreakReminderBottomSheet(
-                        level: safetyViewModel.drivingTimer.breakReminderLevel,
-                        drivingTime: safetyViewModel.drivingTimer.formattedDrivingTime,
-                        onStartBreak: {
-                            startBreakFromReminder()
-                        },
-                        onDismiss: {
-                            // Log as ignored but keep bottom sheet for critical
-                            if safetyViewModel.drivingTimer.breakReminderLevel == .critical {
-                                // Critical stays persistent
-                            } else {
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    safetyViewModel.drivingTimer.breakReminderDismissed = false
-                                }
+                BreakReminderBottomSheet(
+                    level: safetyViewModel.drivingTimer.breakReminderLevel,
+                    drivingTime: safetyViewModel.drivingTimer.formattedDrivingTime,
+                    onStartBreak: {
+                        startBreakFromReminder()
+                    },
+                    onDismiss: {
+                        if safetyViewModel.drivingTimer.breakReminderLevel == .critical {
+                            // Critical stays persistent
+                        } else {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                safetyViewModel.drivingTimer.breakReminderDismissed = false
                             }
                         }
-                    )
-                    .padding(.bottom, 100)
-                }
+                    }
+                )
+                .padding(.bottom, 100)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: safetyViewModel.drivingTimer.breakReminderDismissed)
             }
-
-            // Fatigue Warning Banner
+        }
+        // Fatigue Warning Banner
+        .overlay(alignment: .top) {
             if safetyViewModel.showFatigueBanner {
-                VStack {
-                    FatigueBanner(
-                        message: safetyViewModel.fatigueBannerMessage,
-                        isCritical: safetyViewModel.fatigueBannerIsCritical,
-                        onDismiss: {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                safetyViewModel.dismissFatigueBanner()
-                            }
+                FatigueBanner(
+                    message: safetyViewModel.fatigueBannerMessage,
+                    isCritical: safetyViewModel.fatigueBannerIsCritical,
+                    onDismiss: {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            safetyViewModel.dismissFatigueBanner()
                         }
-                    )
-                    .padding(.top, 8)
-                    Spacer()
-                }
+                    }
+                )
+                .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: safetyViewModel.showFatigueBanner)
             }
-
-            // SOS Sent Banner
+        }
+        // SOS Sent Banner
+        .overlay(alignment: .top) {
             if safetyViewModel.showSOSSentBanner {
-                VStack {
-                    SOSSentBanner {
-                        withAnimation {
-                            safetyViewModel.showSOSSentBanner = false
-                        }
+                SOSSentBanner {
+                    withAnimation {
+                        safetyViewModel.showSOSSentBanner = false
                     }
-                    .padding(.top, 8)
-                    Spacer()
                 }
+                .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -188,6 +173,8 @@ public struct DriverDashboardView: View {
             tripId: viewModel.activeTrip?.id ?? "",
             vehicleId: viewModel.assignedVehicle?.id ?? ""
         )
+        // Persist to @State so the same instance is reused across body re-evaluations
+        breakLogViewModel = vm
         return vm
     }
 
