@@ -174,6 +174,9 @@ public struct DriverDashboardView: View {
                 updateBreakLogViewModel()
             }
         }
+        .task {
+            await viewModel.fetchLiveDashboardData()
+        }
     }
 
     // MARK: - Helpers
@@ -197,8 +200,17 @@ public struct DriverDashboardView: View {
     }
 
     private func startBreakFromReminder() {
-        updateBreakLogViewModel()
-        breakLogViewModel?.startBreak()
+        // Use existing VM or create one — call startBreak on the same reference
+        let vm = breakLogViewModel ?? {
+            let new = BreakLogViewModel(
+                driverId: viewModel.driver.id,
+                tripId: viewModel.activeTrip?.id ?? "",
+                vehicleId: viewModel.assignedVehicle?.id ?? ""
+            )
+            breakLogViewModel = new
+            return new
+        }()
+        vm.startBreak()
         safetyViewModel.drivingTimer.startBreak()
     }
 
