@@ -129,11 +129,14 @@ public final class TripReplayViewModel {
             gpsPoints = gps
             incidents = inc
             breakLogs = brk
-            currentIndex = 0
             
             let status = trip.status?.lowercased() ?? ""
-            if status == "in_progress" || status == "ongoing" || status == "active" {
+            let isLive = status == "in_progress" || status == "ongoing" || status == "active" || status == "in_transit"
+            if isLive {
+                currentIndex = gpsPoints.isEmpty ? 0 : gpsPoints.count - 1
                 startLivePolling()
+            } else {
+                currentIndex = 0
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -248,10 +251,11 @@ public final class TripReplayViewModel {
             guard !newPings.isEmpty else { return }
 
             print("[TripReplayViewModel] 📍 Polled \(newPings.count) new GPS pings.")
-            let wasAtEnd = currentIndex == (gpsPoints.count - 1)
+            let previousCount = gpsPoints.count
+            let wasAtEnd = currentIndex == (previousCount - 1)
             gpsPoints.append(contentsOf: newPings)
             
-            if wasAtEnd || currentIndex == 0 {
+            if wasAtEnd || previousCount == 0 {
                 // Auto-advance to the latest point (live tracking behavior).
                 seek(to: gpsPoints.count - 1)
             }

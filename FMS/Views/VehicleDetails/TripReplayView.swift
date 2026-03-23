@@ -84,6 +84,7 @@ public struct TripReplayView: View {
         }
         .onDisappear {
             vm.stopLivePolling()
+            vm.pause()
         }
     }
 
@@ -230,6 +231,35 @@ public struct TripReplayView: View {
 
     // MARK: - Event Timeline Panel
 
+    private enum TimelineEvent: Identifiable {
+        case incident(Incident)
+        case breakLog(BreakLog)
+
+        var id: String {
+            switch self {
+            case .incident(let incident):
+                return "incident-\(incident.id)"
+            case .breakLog(let breakLog):
+                return "break-\(breakLog.id)"
+            }
+        }
+
+        var date: Date? {
+            switch self {
+            case .incident(let incident):
+                return incident.createdAt
+            case .breakLog(let breakLog):
+                return breakLog.startTime
+            }
+        }
+    }
+
+    private var timelineEvents: [TimelineEvent] {
+        let events = vm.incidents.map { TimelineEvent.incident($0) }
+            + vm.breakLogs.map { TimelineEvent.breakLog($0) }
+        return events.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+    }
+
     private var eventTimelinePanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Handle
@@ -248,36 +278,35 @@ public struct TripReplayView: View {
 
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    // Incidents
-                    ForEach(vm.incidents) { incident in
-                        eventRow(
-                            icon: incident.severity == "hard_brake"
-                                ? "exclamationmark.triangle.fill"
-                                : "burst.fill",
-                            iconColor: FMSTheme.alertRed,
-                            title: incident.severity == "hard_brake" ? "Hard Brake" : "Possible Crash",
-                            subtitle: formatEventDate(incident.createdAt),
-                            detail: incidentSpeedDetail(incident)
-                        )
-                    }
-
-                    // Break logs
-                    ForEach(vm.breakLogs) { breakLog in
-                        eventRow(
-                            icon: "cup.and.heat.waves.fill",
-                            iconColor: FMSTheme.textSecondary,
-                            title: "Driver Break",
-                            subtitle: formatEventDate(breakLog.startTime),
-                            detail: breakLog.formattedDuration
-                        )
-                    }
-
-                    if vm.incidents.isEmpty && vm.breakLogs.isEmpty {
+                    if timelineEvents.isEmpty {
                         Text("No events recorded for this trip.")
                             .font(.system(size: 13))
                             .foregroundColor(FMSTheme.textTertiary)
                             .padding(.vertical, 20)
                             .frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(timelineEvents) { event in
+                            switch event {
+                            case .incident(let incident):
+                                eventRow(
+                                    icon: incident.severity == "hard_brake"
+                                        ? "exclamationmark.triangle.fill"
+                                        : "burst.fill",
+                                    iconColor: FMSTheme.alertRed,
+                                    title: incident.severity == "hard_brake" ? "Hard Brake" : "Possible Crash",
+                                    subtitle: formatEventDate(incident.createdAt),
+                                    detail: incidentSpeedDetail(incident)
+                                )
+                            case .breakLog(let breakLog):
+                                eventRow(
+                                    icon: "cup.and.heat.waves.fill",
+                                    iconColor: FMSTheme.textSecondary,
+                                    title: "Driver Break",
+                                    subtitle: formatEventDate(breakLog.startTime),
+                                    detail: breakLog.formattedDuration
+                                )
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
