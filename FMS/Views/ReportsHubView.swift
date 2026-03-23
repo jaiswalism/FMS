@@ -40,6 +40,14 @@ public struct ReportsHubView: View {
                         color: FMSTheme.alertRed,
                         destination: FleetUtilizationView()
                     )
+
+                    reportCard(
+                        icon: "chart.bar.doc.horizontal.fill",
+                        title: "Weekly Summary",
+                        subtitle: "Comprehensive weekly breakdown of trips, fuel, and safety",
+                        color: FMSTheme.amber,
+                        destination: FleetReportView()
+                    )
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
