@@ -9,6 +9,10 @@ public struct FleetReportView: View {
     @State private var showVehiclePicker = false
     @State private var showDriverPicker = false
     
+    // Temporary draft dates for the custom date range sheet
+    @State private var draftStartDate: Date = Date()
+    @State private var draftEndDate: Date = Date()
+    
     public init() {}
     
     public var body: some View {
@@ -60,11 +64,15 @@ public struct FleetReportView: View {
         .sheet(isPresented: $showDatePicker) {
             NavigationStack {
                 Form {
-                    DatePicker("Start Date", selection: $viewModel.startDate, displayedComponents: .date)
-                    DatePicker("End Date", selection: $viewModel.endDate, in: viewModel.startDate..., displayedComponents: .date)
+                    DatePicker("Start Date", selection: $draftStartDate, displayedComponents: .date)
+                    DatePicker("End Date", selection: $draftEndDate, in: draftStartDate..., displayedComponents: .date)
                 }
                 .navigationTitle("Custom Date Range")
                 .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    draftStartDate = viewModel.startDate
+                    draftEndDate = viewModel.endDate
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Cancel") {
@@ -73,6 +81,8 @@ public struct FleetReportView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Apply") {
+                            viewModel.startDate = draftStartDate
+                            viewModel.endDate = draftEndDate
                             showDatePicker = false
                             viewModel.selectedPreset = .custom
                             Task { await loadData() }
