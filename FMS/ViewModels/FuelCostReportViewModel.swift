@@ -118,9 +118,11 @@ public final class FuelCostReportViewModel {
     do {
       let calendar = Calendar.current
       let iso = ISO8601DateFormatter()
-      let from = iso.string(from: startDate)
-      let rangeEnd = Self.endOfDay(for: endDate)
-      let to = iso.string(from: rangeEnd)
+      let reportStart = calendar.startOfDay(for: startDate)
+      let reportEndExclusive =
+        calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: endDate)) ?? endDate
+      let from = iso.string(from: reportStart)
+      let toExclusive = iso.string(from: reportEndExclusive)
 
       var vehiclesQuery = SupabaseService.shared.client
         .from("vehicles")
@@ -136,14 +138,14 @@ public final class FuelCostReportViewModel {
         .from("trips")
         .select("id, vehicle_id, distance_km, fuel_used_liters, start_time")
         .gte("start_time", value: from)
-        .lte("start_time", value: to)
+        .lt("start_time", value: toExclusive)
         .execute().value
 
       let fuelRows: [FuelPriceRow] = try await SupabaseService.shared.client
         .from("fuel_logs")
         .select("trip_id, amount_paid, fuel_volume")
         .gte("logged_at", value: from)
-        .lte("logged_at", value: to)
+        .lt("logged_at", value: toExclusive)
         .execute().value
 
       let totalPaid = fuelRows.compactMap(\.amountPaid).reduce(0, +)
@@ -188,30 +190,30 @@ public final class FuelCostReportViewModel {
       }
 
       // Budget approximation based on 90-day historical spend trend.
-      let ninetyDaysAgo = calendar.date(byAdding: .day, value: -90, to: startDate) ?? startDate
-      let baselineEnd = startDate.addingTimeInterval(-1)
-      let historicalFrom = iso.string(from: ninetyDaysAgo)
-      let historicalTo = iso.string(from: baselineEnd)
+      let baselineStart = calendar.date(byAdding: .day, value: -90, to: reportStart) ?? reportStart
+      let baselineEndExclusive = reportStart
+      let historicalFrom = iso.string(from: baselineStart)
+      let historicalToExclusive = iso.string(from: baselineEndExclusive)
       let historicalTrips: [TripFuelRow] = try await SupabaseService.shared.client
         .from("trips")
         .select("id, vehicle_id, distance_km, fuel_used_liters, start_time")
         .gte("start_time", value: historicalFrom)
-        .lte("start_time", value: historicalTo)
+        .lt("start_time", value: historicalToExclusive)
         .execute().value
 
       let historicalFuelRows: [FuelPriceRow] = try await SupabaseService.shared.client
         .from("fuel_logs")
         .select("trip_id, amount_paid, fuel_volume")
         .gte("logged_at", value: historicalFrom)
-        .lte("logged_at", value: historicalTo)
+        .lt("logged_at", value: historicalToExclusive)
         .execute().value
 
       let manualFuelByHistoricalTripId = Self.buildManualFuelByTrip(from: historicalFuelRows)
 
       let baselineDays = max(
-        1, (calendar.dateComponents([.day], from: ninetyDaysAgo, to: baselineEnd).day ?? 0) + 1)
+        1, calendar.dateComponents([.day], from: baselineStart, to: baselineEndExclusive).day ?? 0)
       let reportDays = max(
-        1, (calendar.dateComponents([.day], from: startDate, to: rangeEnd).day ?? 0) + 1)
+        1, calendar.dateComponents([.day], from: reportStart, to: reportEndExclusive).day ?? 0)
 
       var historicalLitersByVehicle: [String: Double] = [:]
       for row in historicalTrips {
@@ -248,11 +250,6 @@ public final class FuelCostReportViewModel {
       guard fetchID == currentFetchID else { return }
       errorMessage = error.localizedDescription
     }
-  }
-
-  private static func endOfDay(for date: Date) -> Date {
-    let calendar = Calendar.current
-    return calendar.date(bySettingHour: 23, minute: 59, second: 59, of: date) ?? date
   }
 
   private static func buildManualFuelByTrip(from rows: [FuelPriceRow]) -> [String: Double] {

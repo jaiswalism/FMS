@@ -199,21 +199,56 @@ public final class FuelEfficiencyViewModel {
   ) -> Double? {
     guard let distance = trip.distanceKm, distance > 0 else { return nil }
 
+    let calibratedKmPerLiter = 9.0
+    let relativeTolerance = 0.15
+
     // Three-step Fuel Intelligence verification inputs:
     // 1) Manual fuel entry from fuel_logs for this trip
     // 2) GPS-distance-derived fuel estimate
     // 3) Trip fuel field as slider/operator telemetry proxy
     let manual = sanitizedFuel(manualFuelLiters)
-    let gpsDerived = sanitizedFuel(distance / 8.0)
+    let gpsDerived = sanitizedFuel(distance / calibratedKmPerLiter)
     let sliderTelemetry = sanitizedFuel(trip.fuelUsedLiters)
 
     let candidates = [manual, gpsDerived, sliderTelemetry].compactMap { $0 }
-    guard !candidates.isEmpty else { return nil }
+    guard candidates.count >= 2 else { return nil }
 
-    let sorted = candidates.sorted()
-    if sorted.count == 1 { return sorted[0] }
-    if sorted.count == 2 { return (sorted[0] + sorted[1]) / 2.0 }
-    return sorted[1]
+    func agrees(_ lhs: Double, _ rhs: Double) -> Bool {
+      let denominator = max(lhs, rhs)
+      guard denominator > 0 else { return false }
+      return abs(lhs - rhs) / denominator <= relativeTolerance
+    }
+
+    if candidates.count == 2 {
+      return agrees(candidates[0], candidates[1]) ? (candidates[0] + candidates[1]) / 2.0 : nil
+    }
+
+    guard
+      let manual,
+      let gpsDerived,
+      let sliderTelemetry
+    else {
+      return nil
+    }
+
+    let manualGpsAgree = agrees(manual, gpsDerived)
+    let manualSliderAgree = agrees(manual, sliderTelemetry)
+    let gpsSliderAgree = agrees(gpsDerived, sliderTelemetry)
+
+    if manualGpsAgree && manualSliderAgree && gpsSliderAgree {
+      return [manual, gpsDerived, sliderTelemetry].sorted()[1]
+    }
+    if manualGpsAgree {
+      return (manual + gpsDerived) / 2.0
+    }
+    if manualSliderAgree {
+      return (manual + sliderTelemetry) / 2.0
+    }
+    if gpsSliderAgree {
+      return (gpsDerived + sliderTelemetry) / 2.0
+    }
+
+    return nil
   }
 
   private static func sanitizedFuel(_ liters: Double?) -> Double? {
