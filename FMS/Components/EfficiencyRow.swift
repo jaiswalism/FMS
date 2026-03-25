@@ -35,6 +35,25 @@ public struct EfficiencyRow: View {
                     .foregroundStyle(tierColor)
             }
 
+            HStack(spacing: 10) {
+                Text(String(format: "Baseline %.1f km/L", vehicle.baselineKmPerLiter))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(FMSTheme.textSecondary)
+
+                Spacer()
+
+                let diff = vehicle.percentDifference
+                Text(String(format: "%+.1f%%", diff))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(diff >= 0 ? FMSTheme.alertGreen : FMSTheme.alertRed)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        (diff >= 0 ? FMSTheme.alertGreen : FMSTheme.alertRed).opacity(0.15),
+                        in: Capsule()
+                    )
+            }
+
             // Linear gauge 0–20
             Gauge(value: min(vehicle.kmPerLiter, 20), in: 0...20) {
                 EmptyView()

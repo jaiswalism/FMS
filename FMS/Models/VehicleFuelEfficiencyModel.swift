@@ -7,24 +7,28 @@ public struct VehicleFuelEfficiency: Decodable, Identifiable {
   public let plateNumber: String
   public let totalTrips: Int
   public let kmPerLiter: Double
+  public let baselineKmPerLiter: Double
 
   enum CodingKeys: String, CodingKey {
     case vehicleId = "vehicle_id"
     case plateNumber = "plate_number"
     case totalTrips = "total_trips"
     case kmPerLiter = "km_per_liter"
+    case baselineKmPerLiter = "baseline_km_per_liter"
   }
 
   public init(
     vehicleId: String,
     plateNumber: String,
     totalTrips: Int,
-    kmPerLiter: Double
+    kmPerLiter: Double,
+    baselineKmPerLiter: Double
   ) {
     self.vehicleId = vehicleId
     self.plateNumber = plateNumber
     self.totalTrips = totalTrips
     self.kmPerLiter = kmPerLiter
+    self.baselineKmPerLiter = baselineKmPerLiter
   }
 
   public init(from decoder: Decoder) throws {
@@ -33,6 +37,8 @@ public struct VehicleFuelEfficiency: Decodable, Identifiable {
     plateNumber = try container.decode(String.self, forKey: .plateNumber)
     totalTrips = try container.decodeIfPresent(Int.self, forKey: .totalTrips) ?? 0
     kmPerLiter = try container.decodeIfPresent(Double.self, forKey: .kmPerLiter) ?? 0
+    baselineKmPerLiter =
+      try container.decodeIfPresent(Double.self, forKey: .baselineKmPerLiter) ?? kmPerLiter
   }
 
   /// Color tier based on efficiency value.
@@ -51,4 +57,9 @@ public struct VehicleFuelEfficiency: Decodable, Identifiable {
   }
 
   public var tier: EfficiencyTier { .init(kmPerLiter: kmPerLiter) }
+
+  public var percentDifference: Double {
+    guard baselineKmPerLiter > 0 else { return 0 }
+    return ((kmPerLiter - baselineKmPerLiter) / baselineKmPerLiter) * 100
+  }
 }

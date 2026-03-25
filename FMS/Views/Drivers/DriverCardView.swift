@@ -49,7 +49,7 @@ struct DriverCardView: View {
         ShiftProgressRow(label: driver.shiftProgressLabel, progress: driver.shiftProgress)
       }
 
-      CallButton(action: onCall)
+      CallButton(action: onCall, phoneNumber: driver.phone)
     }
     .padding(.leading, 14)
     .padding(.trailing, 16)
@@ -256,10 +256,19 @@ private struct ThickProgressBar: View {
 
 private struct CallButton: View {
   let action: (() -> Void)?
+  let phoneNumber: String?
+  @Environment(\.openURL) var openURL
 
   var body: some View {
     Button {
-      action?()
+      if let phone = phoneNumber, !phone.isEmpty {
+        let cleanedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: "tel:\(cleanedPhone)") {
+          openURL(url)
+        }
+      } else {
+        action?()
+      }
     } label: {
       Label("Call", systemImage: "phone.fill")
         .font(.subheadline.weight(.semibold))
@@ -268,8 +277,14 @@ private struct CallButton: View {
         .padding(.vertical, 9)
         .background(FMSTheme.amber, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
-    .disabled(action == nil)
-    .opacity(action == nil ? 0.5 : 1.0)
+    .disabled(
+      phoneNumber == nil
+        || phoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+    )
+    .opacity(
+      (phoneNumber == nil
+        || phoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? 0.5 : 1.0
+    )
   }
 }
 

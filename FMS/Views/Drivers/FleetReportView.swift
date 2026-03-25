@@ -12,23 +12,31 @@ public struct FleetReportView: View {
     // Temporary draft dates for the custom date range sheet
     @State private var draftStartDate: Date = Date()
     @State private var draftEndDate: Date = Date()
-    
     public init() {}
     
     public var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                weekSelector
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
                 // 1. Filter Bar
                 filterBar
                     .padding(.horizontal)
-                    .padding(.top, 8)
                 
                 if viewModel.isLoading {
                     ProgressView("Crunching fleet data...")
                         .padding(.top, 50)
                 } else {
+                    weeklySummarySection
+                        .padding(.horizontal)
+
                     // 2. Metrics Grid
                     metricsGrid
+                        .padding(.horizontal)
+
+                    driverRankingSection
                         .padding(.horizontal)
                     
                     // 3. Email Subscription Toggle
@@ -42,6 +50,17 @@ public struct FleetReportView: View {
         .navigationTitle("Fleet Report")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if !viewModel.isLoading {
+                    ShareLink(
+                        item: viewModel.weeklyCSVReport(),
+                        subject: Text("Weekly Fleet Performance Report"),
+                        message: Text("Exported weekly report")
+                    ) {
+                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if viewModel.selectedPreset != .thisWeek || viewModel.selectedVehicleId != nil || viewModel.selectedDriverId != nil {
                     Button("Clear Filters") {
@@ -104,6 +123,78 @@ public struct FleetReportView: View {
     }
     
     // MARK: - Filters
+
+    private var weekSelector: some View {
+        HStack(spacing: 14) {
+            Button {
+                viewModel.moveWeek(by: -1)
+                Task { await loadData() }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(FMSTheme.textPrimary)
+                    .frame(width: 32, height: 32)
+                    .background(FMSTheme.cardBackground)
+                    .clipShape(Circle())
+            }
+
+            VStack(spacing: 2) {
+                Text("Weekly Report")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(FMSTheme.textSecondary)
+                Text(viewModel.weekLabel)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(FMSTheme.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+
+            Button {
+                viewModel.moveWeek(by: 1)
+                Task { await loadData() }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(FMSTheme.textPrimary)
+                    .frame(width: 32, height: 32)
+                    .background(FMSTheme.cardBackground)
+                    .clipShape(Circle())
+            }
+        }
+    }
+
+    private var weeklySummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Fleet Efficiency Summary")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(FMSTheme.textPrimary)
+
+            HStack(spacing: 12) {
+                ReportMetricCard(
+                    icon: "gauge.with.dots.needle.67percent",
+                    title: "Avg Behavior Score",
+                    value: String(format: "%.1f", viewModel.averageBehaviorScore)
+                )
+                ReportMetricCard(
+                    icon: "road.lanes",
+                    title: "Total KM",
+                    value: String(format: "%.0f", viewModel.totalDistanceKm)
+                )
+            }
+
+            HStack(spacing: 12) {
+                ReportMetricCard(
+                    icon: "fuelpump.fill",
+                    title: "Fuel Consumed",
+                    value: String(format: "%.1f L", viewModel.totalFuelLiters)
+                )
+                ReportMetricCard(
+                    icon: "checkmark.seal.fill",
+                    title: "Completed Trips",
+                    value: "\(viewModel.completedTrips)/\(viewModel.totalTrips)"
+                )
+            }
+        }
+    }
     
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -253,6 +344,47 @@ public struct FleetReportView: View {
                 }
             }
         }
+    }
+
+    private var driverRankingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Driver Behavior Rankings")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(FMSTheme.textPrimary)
+
+            rankingCard(title: "Top 5 Drivers", rows: viewModel.topDrivers)
+            rankingCard(title: "Bottom 5 Drivers", rows: viewModel.bottomDrivers)
+        }
+    }
+
+    private func rankingCard(title: String, rows: [FleetReportViewModel.DriverPerformance]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(FMSTheme.textPrimary)
+
+            if rows.isEmpty {
+                Text("No driver data for selected week.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(FMSTheme.textTertiary)
+            } else {
+                ForEach(rows) { row in
+                    HStack {
+                        Text(row.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(FMSTheme.textPrimary)
+                        Spacer()
+                        Text(String(format: "%.1f", row.behaviorScore))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(row.behaviorScore >= 70 ? FMSTheme.alertGreen : FMSTheme.alertRed)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding(14)
+        .background(FMSTheme.cardBackground)
+        .cornerRadius(12)
     }
     
     // MARK: - Email Subscription
