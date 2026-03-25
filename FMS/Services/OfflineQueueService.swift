@@ -17,7 +17,6 @@ public struct QueuedPayload: Codable, Identifiable {
     public let jsonData: Data
     public let createdAt: Date
     public var retryCount: Int
-    /// For update payloads: the DB row id to patch. nil means this is an insert.
     public let recordId: String?
 
     public init(type: QueuedPayloadType, tableName: String, jsonData: Data, recordId: String? = nil) {
@@ -66,7 +65,6 @@ public final class OfflineQueueService {
         }
     }
 
-    /// Attempt Supabase update. On failure, queue the payload for retry via processQueue.
     public func updateOrQueue<T: Encodable>(
         table: String,
         payload: T,
@@ -87,36 +85,32 @@ public final class OfflineQueueService {
         }
     }
 
-    /// Queue a payload directly (without attempting insert first).
     public func enqueue<T: Encodable>(table: String, payload: T, type: QueuedPayloadType, recordId: String? = nil) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         guard let jsonData = try? encoder.encode(payload) else { return }
         let queued = QueuedPayload(type: type, tableName: table, jsonData: jsonData, recordId: recordId)
-        var queue = loadQueue()
-        queue.append(queued)
-        saveQueue(queue)
+        
+        let queue = loadQueue()
+        saveQueue(queue + [queued])
     }
 
-    /// Process all queued payloads.
     public func processQueue() async {
         guard !isProcessing else { return }
         isProcessing = true
 
-        var queue = loadQueue()
+        let queue = loadQueue()
         var failedItems: [QueuedPayload] = []
 
         for var item in queue {
             do {
                 if let recordId = item.recordId {
-                    // This was a failed update — replay as PATCH using the original row id
                     try await SupabaseService.shared.client
                         .from(item.tableName)
                         .update(AnyJSON(item.jsonData))
                         .eq("id", value: recordId)
                         .execute()
                 } else {
-                    // This was a failed insert — replay as INSERT
                     try await SupabaseService.shared.client
                         .from(item.tableName)
                         .insert(AnyJSON(item.jsonData))
@@ -127,7 +121,6 @@ public final class OfflineQueueService {
                 if item.retryCount < maxRetries {
                     failedItems.append(item)
                 }
-                // Items exceeding maxRetries are dropped
             }
         }
 
@@ -153,7 +146,7 @@ public final class OfflineQueueService {
         networkMonitor?.start(queue: DispatchQueue(label: "fms.network.monitor"))
     }
 
-    // MARK: - Persistence (UserDefaults)
+    // MARK: - Persistence
 
     private func loadQueue() -> [QueuedPayload] {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return [] }
@@ -172,9 +165,7 @@ public final class OfflineQueueService {
 private struct AnyJSON: Encodable {
     let data: Data
 
-    init(_ data: Data) {
-        self.data = data
-    }
+    init(_ data: Data) { self.data = data }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
@@ -191,9 +182,9 @@ private struct AnyCodable: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues(\.value)
+            value = dict
         } else if let arr = try? container.decode([AnyCodable].self) {
-            value = arr.map(\.value)
+            value = arr
         } else if let str = try? container.decode(String.self) {
             value = str
         } else if let num = try? container.decode(Double.self) {
@@ -210,20 +201,13 @@ private struct AnyCodable: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch value {
-        case let str as String: try container.encode(str)
-        case let num as Double: try container.encode(num)
-        case let num as Int: try container.encode(num)
-        case let bool as Bool: try container.encode(bool)
-        case let dict as [String: Any]:
-            try container.encode(dict.mapValues { AnyCodable(value: $0) })
-        case let arr as [Any]:
-            try container.encode(arr.map { AnyCodable(value: $0) })
-        case is NSNull: try container.encodeNil()
+        case let n as Int: try container.encode(n)
+        case let n as Double: try container.encode(n)
+        case let s as String: try container.encode(s)
+        case let b as Bool: try container.encode(b)
+        case let d as [String: AnyCodable]: try container.encode(d)
+        case let a as [AnyCodable]: try container.encode(a)
         default: try container.encodeNil()
         }
-    }
-
-    init(value: Any) {
-        self.value = value
     }
 }

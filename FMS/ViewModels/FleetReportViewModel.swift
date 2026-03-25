@@ -215,7 +215,7 @@ public final class FleetReportViewModel {
             if let dId = selectedDriverId { fuelQ = fuelQ.eq("driver_id", value: dId) }
             
             // 3. INCIDENTS (using created_at)
-            var incidentsQ = builder.from("incidents").select("id, driver_id")
+            var incidentsQ = builder.from("incidents").select("id")
                 .gte("created_at", value: startStr)
                 .lte("created_at", value: endStr)
             if let vId = selectedVehicleId { incidentsQ = incidentsQ.eq("vehicle_id", value: vId) }
@@ -243,16 +243,9 @@ public final class FleetReportViewModel {
             async let tIncidents: [IDRow] = incidentsQ.execute().value
             async let tEvents: [IDRow] = eventsQ.execute().value
             async let tMaintenance: [StatusRow] = maintenanceQ.execute().value
-
-            var driverTripsQ = builder.from("trips").select("driver_id, distance_km, fuel_used_liters")
-                .gte("start_time", value: startStr)
-                .lte("start_time", value: endStr)
-            if let vId = selectedVehicleId { driverTripsQ = driverTripsQ.eq("vehicle_id", value: vId) }
-
-            async let tDriverTrips: [DriverTripRow] = driverTripsQ.execute().value
             
-            let (trips, fuel, incidents, events, maintenance, driverTrips) =
-                try await (tTrips, tFuel, tIncidents, tEvents, tMaintenance, tDriverTrips)
+            let (trips, fuel, incidents, events, maintenance) =
+                try await (tTrips, tFuel, tIncidents, tEvents, tMaintenance)
             
             // Perform Aggregations
             self.totalTrips = trips.count
@@ -267,109 +260,12 @@ public final class FleetReportViewModel {
             
             self.activeMaintenanceCount = maintenance.filter { $0.status != "completed" }.count
             self.completedMaintenanceCount = maintenance.filter { $0.status == "completed" }.count
-
-            buildDriverRanking(drivers: availableDrivers, trips: driverTrips, incidents: incidents, events: events)
             
         } catch {
             self.errorMessage = "Failed to load report data: \(error.localizedDescription)"
         }
         
         isLoading = false
-    }
-
-    private func buildDriverRanking(
-        drivers: [LiveDriverResource],
-        trips: [DriverTripRow],
-        incidents: [IDRow],
-        events: [IDRow]
-    ) {
-        struct Aggregates {
-            var distance: Double = 0
-            var fuel: Double = 0
-            var incidents: Int = 0
-            var events: Int = 0
-        }
-
-        var map: [String: Aggregates] = [:]
-        for trip in trips {
-            guard let driverId = trip.driver_id else { continue }
-            var entry = map[driverId] ?? Aggregates()
-            entry.distance += trip.distance_km ?? 0
-            entry.fuel += trip.fuel_used_liters ?? 0
-            map[driverId] = entry
-        }
-
-        for incident in incidents {
-            guard let driverId = incident.driver_id else { continue }
-            var entry = map[driverId] ?? Aggregates()
-            entry.incidents += 1
-            map[driverId] = entry
-        }
-
-        for event in events {
-            guard let driverId = event.driver_id else { continue }
-            var entry = map[driverId] ?? Aggregates()
-            entry.events += 1
-            map[driverId] = entry
-        }
-
-        let ranking: [DriverPerformance] = drivers.compactMap { driver in
-            guard let aggregate = map[driver.id] else { return nil }
-            let efficiencyComponent: Double
-            if aggregate.fuel > 0 {
-                efficiencyComponent = min((aggregate.distance / aggregate.fuel) * 4.0, 30)
-            } else {
-                efficiencyComponent = 0
-            }
-            let penalty = Double(aggregate.incidents * 12 + aggregate.events * 6)
-            let score = max(0, min(100, 70 + efficiencyComponent - penalty))
-
-            return DriverPerformance(
-                id: driver.id,
-                name: driver.name,
-                behaviorScore: score,
-                distanceKm: aggregate.distance,
-                fuelLiters: aggregate.fuel
-            )
-        }
-        .sorted { $0.behaviorScore > $1.behaviorScore }
-
-        topDrivers = Array(ranking.prefix(5))
-        bottomDrivers = Array(ranking.suffix(5)).reversed()
-        if ranking.isEmpty {
-            averageBehaviorScore = 0
-        } else {
-            averageBehaviorScore = ranking.map(\.behaviorScore).reduce(0, +) / Double(ranking.count)
-        }
-    }
-
-    public func weeklyCSVReport() -> String {
-        var lines: [String] = []
-        lines.append("Metric,Value")
-        lines.append("Week,\(weekLabel)")
-        lines.append("Total Trips,\(totalTrips)")
-        lines.append("Completed Trips,\(completedTrips)")
-        lines.append("Total Distance (km),\(String(format: "%.2f", totalDistanceKm))")
-        lines.append("Fuel Consumed (L),\(String(format: "%.2f", totalFuelLiters))")
-        lines.append("Average Driver Behavior Score,\(String(format: "%.2f", averageBehaviorScore))")
-        lines.append("")
-        lines.append("Top Drivers")
-        lines.append("Driver,Behavior Score,Distance (km),Fuel (L)")
-        for row in topDrivers {
-            lines.append("\(escapeCSV(row.name)),\(String(format: "%.2f", row.behaviorScore)),\(String(format: "%.2f", row.distanceKm)),\(String(format: "%.2f", row.fuelLiters))")
-        }
-        lines.append("")
-        lines.append("Bottom Drivers")
-        lines.append("Driver,Behavior Score,Distance (km),Fuel (L)")
-        for row in bottomDrivers {
-            lines.append("\(escapeCSV(row.name)),\(String(format: "%.2f", row.behaviorScore)),\(String(format: "%.2f", row.distanceKm)),\(String(format: "%.2f", row.fuelLiters))")
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private func escapeCSV(_ value: String) -> String {
-        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
     }
     
     // MARK: - Email Subscription

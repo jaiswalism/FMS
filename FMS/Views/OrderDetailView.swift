@@ -522,10 +522,12 @@ public struct OrderDetailView: View {
             let request = MKDirections.Request()
 
             request.source = MKMapItem(
-                placemark: MKPlacemark(coordinate: coords[i])
+                location: CLLocation(latitude: coords[i].latitude, longitude: coords[i].longitude),
+                address: nil
             )
             request.destination = MKMapItem(
-                placemark: MKPlacemark(coordinate: coords[i + 1])
+                location: CLLocation(latitude: coords[i + 1].latitude, longitude: coords[i + 1].longitude),
+                address: nil
             )
             request.transportType = .automobile
 
