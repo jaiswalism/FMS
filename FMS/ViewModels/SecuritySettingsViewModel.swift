@@ -65,7 +65,7 @@ public final class SecuritySettingsViewModel {
             // Clean up any unverified factors that might be lingering from a failed setup
             if let factors = try? await SupabaseService.shared.client.auth.mfa.listFactors() {
                 for factor in factors.all where factor.factorType == "totp" && factor.status == .unverified {
-                    try? await SupabaseService.shared.client.auth.mfa.unenroll(params: MFAUnenrollParams(factorId: factor.id))
+                    _ = try? await SupabaseService.shared.client.auth.mfa.unenroll(params: MFAUnenrollParams(factorId: factor.id))
                 }
             }
 

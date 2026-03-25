@@ -155,30 +155,28 @@ public final class BreakLogViewModel: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Fetch History
 
-    public func fetchBreakHistory() {
-        Task {
-            do {
-                guard !tripId.isEmpty else { return }
-                let response = try await SupabaseService.shared.client
-                    .from("break_logs")
-                    .select()
-                    .eq("trip_id", value: tripId)
-                    .order("start_time", ascending: false)
-                    .limit(50)
-                    .execute()
+    public func fetchBreakHistory() async {
+        do {
+            guard !tripId.isEmpty else { return }
+            let response = try await SupabaseService.shared.client
+                .from("break_logs")
+                .select()
+                .eq("trip_id", value: tripId)
+                .order("start_time", ascending: false)
+                .limit(50)
+                .execute()
 
-                let fetched = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
+            let fetched = try JSONDecoder.supabase().decode([BreakLog].self, from: response.data)
 
-                // Merge: keep locally-logged breaks, add any from DB not already present
-                let localIds = Set(breakLogs.map(\.id))
-                let newFromDB = fetched.filter { !localIds.contains($0.id) }
-                breakLogs = (breakLogs + newFromDB).sorted {
-                    ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast)
-                }
-            } catch {
-                print("⚠️ [BreakLogViewModel] Failed to load breaks (silent fallback): \(error)")
-                self.errorMessage = "Failed to fetch break history: \(error.localizedDescription)"
+            // Merge: keep locally-logged breaks, add any from DB not already present
+            let localIds = Set(breakLogs.map(\.id))
+            let newFromDB = fetched.filter { !localIds.contains($0.id) }
+            breakLogs = (breakLogs + newFromDB).sorted {
+                ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast)
             }
+        } catch {
+            print("[BreakLogViewModel] Failed to load breaks (silent fallback): \(error)")
+            self.errorMessage = "Failed to fetch break history: \(error.localizedDescription)"
         }
     }
     

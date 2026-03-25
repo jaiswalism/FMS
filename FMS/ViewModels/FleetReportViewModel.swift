@@ -136,88 +136,76 @@ public final class FleetReportViewModel {
     }
     
     public func fetchReportData() async {
-        isLoading = true
-        errorMessage = nil
-        
-        // Formatter for Supabase ISO queries
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let startStr = isoFormatter.string(from: startDate)
-        let endStr = isoFormatter.string(from: endDate)
-        
-        do {
-            // Because vehicle_events uses text type for vehicle_id instead of uuid natively, we need to pass a string.
-            // All other tables accept standard uuid equality.
-            let builder = SupabaseService.shared.client
+            isLoading    = true
+            errorMessage = nil
             
-            // 1. TRIPS (using created_at)
-            var tripsQ = builder.from("trips").select("status, distance_km")
-                .gte("created_at", value: startStr)
-                .lte("created_at", value: endStr)
-            if let vId = selectedVehicleId { tripsQ = tripsQ.eq("vehicle_id", value: vId) }
-            if let dId = selectedDriverId { tripsQ = tripsQ.eq("driver_id", value: dId) }
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let startStr = isoFormatter.string(from: startDate)
+            let endStr   = isoFormatter.string(from: endDate)
             
-            // 2. FUEL LOGS (using logged_at)
-            // Note: fuel_logs lacks vehicle_id. If a vehicle is selected, we can't reliably filter it directly 
-            // unless we only use driver filters. We apply the driver filter if present.
-            var fuelQ = builder.from("fuel_logs").select("fuel_volume, amount_paid")
-                .gte("logged_at", value: startStr)
-                .lte("logged_at", value: endStr)
-            if let dId = selectedDriverId { fuelQ = fuelQ.eq("driver_id", value: dId) }
+            do {
+                let builder = SupabaseService.shared.client
+
+                var tripsBuilder = builder.from("trips").select("status, distance_km")
+                    .gte("created_at", value: startStr)
+                    .lte("created_at", value: endStr)
+                if let vId = selectedVehicleId { tripsBuilder = tripsBuilder.eq("vehicle_id", value: vId) }
+                if let dId = selectedDriverId  { tripsBuilder = tripsBuilder.eq("driver_id",  value: dId) }
+                let tripsQ = tripsBuilder
+
+                var fuelBuilder = builder.from("fuel_logs").select("fuel_volume, amount_paid")
+                    .gte("logged_at", value: startStr)
+                    .lte("logged_at", value: endStr)
+                if let dId = selectedDriverId { fuelBuilder = fuelBuilder.eq("driver_id", value: dId) }
+                let fuelQ = fuelBuilder
+
+                var incidentsBuilder = builder.from("incidents").select("id")
+                    .gte("created_at", value: startStr)
+                    .lte("created_at", value: endStr)
+                if let vId = selectedVehicleId { incidentsBuilder = incidentsBuilder.eq("vehicle_id", value: vId) }
+                if let dId = selectedDriverId  { incidentsBuilder = incidentsBuilder.eq("driver_id",  value: dId) }
+                let incidentsQ = incidentsBuilder
+
+                var eventsBuilder = builder.from("vehicle_events").select("id")
+                    .gte("timestamp", value: startStr)
+                    .lte("timestamp", value: endStr)
+                    .in("event_type", values: ["HarshBraking", "RapidAcceleration"])
+                if let vId = selectedVehicleId { eventsBuilder = eventsBuilder.eq("vehicle_id", value: vId) }
+                let eventsQ = eventsBuilder
+
+                var maintenanceBuilder = builder.from("maintenance_work_orders").select("status")
+                    .gte("created_at", value: startStr)
+                    .lte("created_at", value: endStr)
+                if let vId = selectedVehicleId { maintenanceBuilder = maintenanceBuilder.eq("vehicle_id", value: vId) }
+                let maintenanceQ = maintenanceBuilder
+
+                // All five captures are now immutable `let` — safe for concurrent async let
+                async let tTrips:       [TripRow]   = tripsQ.execute().value
+                async let tFuel:        [FuelRow]   = fuelQ.execute().value
+                async let tIncidents:   [IDRow]     = incidentsQ.execute().value
+                async let tEvents:      [IDRow]     = eventsQ.execute().value
+                async let tMaintenance: [StatusRow] = maintenanceQ.execute().value
+                
+                let (trips, fuel, incidents, events, maintenance) =
+                    try await (tTrips, tFuel, tIncidents, tEvents, tMaintenance)
+                
+                self.totalTrips               = trips.count
+                self.completedTrips           = trips.filter { $0.status == "completed" }.count
+                self.totalDistanceKm          = trips.compactMap(\.distance_km).reduce(0, +)
+                self.totalFuelLiters          = fuel.compactMap(\.fuel_volume).reduce(0, +)
+                self.totalFuelCost            = fuel.compactMap(\.amount_paid).reduce(0, +)
+                self.incidentCount            = incidents.count
+                self.safetyEventCount         = events.count
+                self.activeMaintenanceCount   = maintenance.filter { $0.status != "completed" }.count
+                self.completedMaintenanceCount = maintenance.filter { $0.status == "completed" }.count
+                
+            } catch {
+                self.errorMessage = "Failed to load report data: \(error.localizedDescription)"
+            }
             
-            // 3. INCIDENTS (using created_at)
-            var incidentsQ = builder.from("incidents").select("id")
-                .gte("created_at", value: startStr)
-                .lte("created_at", value: endStr)
-            if let vId = selectedVehicleId { incidentsQ = incidentsQ.eq("vehicle_id", value: vId) }
-            if let dId = selectedDriverId { incidentsQ = incidentsQ.eq("driver_id", value: dId) }
-            
-            // 4. VEHICLE EVENTS (using timestamp, text vehicle_id)
-            var eventsQ = builder.from("vehicle_events").select("id")
-                .gte("timestamp", value: startStr)
-                .lte("timestamp", value: endStr)
-                .in("event_type", values: ["HarshBraking", "RapidAcceleration"])
-            if let vId = selectedVehicleId { eventsQ = eventsQ.eq("vehicle_id", value: vId) }
-            // vehicle_events lacks driver_id
-            
-    
-            // 5. MAINTENANCE (using created_at)
-            var maintenanceQ = builder.from("maintenance_work_orders").select("status")
-                .gte("created_at", value: startStr)
-                .lte("created_at", value: endStr)
-            if let vId = selectedVehicleId { maintenanceQ = maintenanceQ.eq("vehicle_id", value: vId) }
-            // lacks driver_id mapping natively on this table (only assigned_to/created_by)
-            
-            // Fire all tasks in parallel
-            async let tTrips: [TripRow] = tripsQ.execute().value
-            async let tFuel: [FuelRow] = fuelQ.execute().value
-            async let tIncidents: [IDRow] = incidentsQ.execute().value
-            async let tEvents: [IDRow] = eventsQ.execute().value
-            async let tMaintenance: [StatusRow] = maintenanceQ.execute().value
-            
-            let (trips, fuel, incidents, events, maintenance) =
-                try await (tTrips, tFuel, tIncidents, tEvents, tMaintenance)
-            
-            // Perform Aggregations
-            self.totalTrips = trips.count
-            self.completedTrips = trips.filter { $0.status == "completed" }.count
-            self.totalDistanceKm = trips.compactMap(\.distance_km).reduce(0, +)
-            
-            self.totalFuelLiters = fuel.compactMap(\.fuel_volume).reduce(0, +)
-            self.totalFuelCost = fuel.compactMap(\.amount_paid).reduce(0, +)
-            
-            self.incidentCount = incidents.count
-            self.safetyEventCount = events.count
-            
-            self.activeMaintenanceCount = maintenance.filter { $0.status != "completed" }.count
-            self.completedMaintenanceCount = maintenance.filter { $0.status == "completed" }.count
-            
-        } catch {
-            self.errorMessage = "Failed to load report data: \(error.localizedDescription)"
+            isLoading = false
         }
-        
-        isLoading = false
-    }
     
     // MARK: - Email Subscription
     

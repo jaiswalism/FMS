@@ -27,8 +27,8 @@ struct DriverSafetyTab: View {
                 .padding(.bottom, 32)
             }
             .refreshable {
-                safetyViewModel.checkFatigueWarnings()
                 await breakLogViewModel.fetchBreakHistory()
+                safetyViewModel.checkFatigueWarnings()
             }
             .background(FMSTheme.backgroundPrimary)
         }

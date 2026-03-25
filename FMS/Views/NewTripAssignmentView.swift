@@ -210,87 +210,83 @@ public struct NewTripAssignmentView: View {
 
     // MARK: - Bottom Sticky Button
     @ViewBuilder
-    private var bottomStickyButton: some View {
-        let hasDestination = trip.endLat != nil && trip.endLng != nil
-        let buttonContent = VStack(spacing: 10) {
-            if trip.status?.lowercased() == "scheduled" {
-                Button {
-                    if tripVehicle ?? viewModel.assignedVehicle != nil {
-                        preTripInspectionCompleted = false
-                        showPreTripInspection = true
+        private var bottomStickyButton: some View {
+            let hasDestination = trip.endLat != nil && trip.endLng != nil
+            VStack(spacing: 10) {
+                if trip.status?.lowercased() == "scheduled" {
+                    Button {
+                        if tripVehicle ?? viewModel.assignedVehicle != nil {
+                            preTripInspectionCompleted = false
+                            showPreTripInspection = true
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.fill").font(.system(size: 14, weight: .bold))
+                            Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Waiting for Vehicle" : "Start Trip")
+                                .font(.headline.weight(.bold))
+                        }
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "play.fill").font(.system(size: 14, weight: .bold))
-                        Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Waiting for Vehicle" : "Start Trip")
-                            .font(.headline.weight(.bold))
-                    }
-                }
-                .buttonStyle(.fmsPrimary)
-                .disabled(viewModel.assignedVehicle == nil)
+                    .buttonStyle(.fmsPrimary)
+                    .disabled(viewModel.assignedVehicle == nil)
 
-                if hasDestination {
-                    navigateButton
-                }
-            } else if trip.status?.lowercased() == "active" {
-                Button {
-                    if tripVehicle ?? viewModel.assignedVehicle != nil {
-                        postTripInspectionCompleted = false
-                        showPostTripInspection = true
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "flag.checkered").font(.system(size: 14, weight: .bold))
-                        Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Missing Vehicle" : "End Trip")
-                            .font(.headline.weight(.bold))
-                    }
-                }
-                .buttonStyle(.fmsPrimary)
-                .disabled((tripVehicle ?? viewModel.assignedVehicle) == nil)
+                    if hasDestination { navigateButton }
 
-                if hasDestination {
-                    navigateButton
-                }
+                } else if trip.status?.lowercased() == "active" {
+                    Button {
+                        if tripVehicle ?? viewModel.assignedVehicle != nil {
+                            postTripInspectionCompleted = false
+                            showPostTripInspection = true
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.checkered").font(.system(size: 14, weight: .bold))
+                            Text((tripVehicle ?? viewModel.assignedVehicle) == nil ? "Missing Vehicle" : "End Trip")
+                                .font(.headline.weight(.bold))
+                        }
+                    }
+                    .buttonStyle(.fmsPrimary)
+                    .disabled((tripVehicle ?? viewModel.assignedVehicle) == nil)
 
-                Button {
-                    showIssueReport = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.bubble.fill").font(.system(size: 14, weight: .semibold))
-                        Text("Report Issue").font(.system(size: 16, weight: .semibold))
+                    if hasDestination { navigateButton }
+
+                    Button {
+                        showIssueReport = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.bubble.fill").font(.system(size: 14, weight: .semibold))
+                            Text("Report Issue").font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(FMSTheme.amber)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background { FMSTheme.amber.opacity(0.12).cornerRadius(14) }
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(FMSTheme.amber.opacity(0.3), lineWidth: 1))
                     }
-                    .foregroundStyle(FMSTheme.amber)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background { FMSTheme.amber.opacity(0.12).cornerRadius(14) }
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(FMSTheme.amber.opacity(0.3), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button(action: {}) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.seal.fill")
-                        Text("Trip Completed")
+                    .buttonStyle(.plain)
+                } else {
+                    Button(action: {}) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.seal.fill")
+                            Text("Trip Completed")
+                        }
                     }
+                    .buttonStyle(.fmsPrimary)
+                    .disabled(true)
                 }
-                .buttonStyle(.fmsPrimary)
-                .disabled(true)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+            .background(
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .mask(LinearGradient(
+                        gradient: Gradient(colors: [.black, .black, .black, .clear]),
+                        startPoint: .bottom, endPoint: .top
+                    ))
+                    .ignoresSafeArea(edges: .bottom)
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
-        .background(
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(LinearGradient(
-                    gradient: Gradient(colors: [.black, .black, .black, .clear]),
-                    startPoint: .bottom, endPoint: .top
-                ))
-                .ignoresSafeArea(edges: .bottom)
-        )
-    }
-
     private var statsSection: some View {
         HStack(spacing: 12) {
             TripStatCard(
