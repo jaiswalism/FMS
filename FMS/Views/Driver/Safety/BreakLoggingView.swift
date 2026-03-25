@@ -24,8 +24,9 @@ struct BreakLoggingView: View {
                 recentBreaksSection
             }
         }
-        .onAppear {
-            viewModel.fetchBreakHistory()
+        
+        .task {
+            await viewModel.fetchBreakHistory()
         }
     }
 
