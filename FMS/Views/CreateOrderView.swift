@@ -432,8 +432,8 @@ public struct CreateOrderView: View {
                 driverId: assignmentPref == .now ? selectedDriverId : nil,
                 vehicleId: assignmentPref == .now ? selectedVehicleId : nil
             )
-            if success { 
-                dismiss() 
+            if success {
+                dismiss()
             } else {
                 showingError = true
             }
