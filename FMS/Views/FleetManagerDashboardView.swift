@@ -59,6 +59,19 @@ struct FleetManagerHomeTab: View {
             }
           )
 
+          // Quick Actions
+          QuickActionCard(
+            icon: "shippingbox.fill",
+            title: "Orders",
+            subtitle:
+              viewModel.pendingOrderCount > 0
+              ? "\(viewModel.pendingOrderCount) pending orders"
+              : "Manage fleet orders and dispatch",
+            action: {
+              navigateToOrders = true
+            }
+          )
+
           // Active SOS Alerts — repositioned below Orders
           if !viewModel.activeSOSAlerts.isEmpty {
             sosAlertsSection
