@@ -42,21 +42,8 @@ struct FleetManagerHomeTab: View {
   @State private var navigateToProfile = false
   @State private var navigateToOrders = false
   @State private var sosExpanded: Bool = false
+  @State private var alertsExpanded: Bool = false
 
-  private let alerts: [(title: String, subtitle: String, timeAgo: String, type: AlertType)] = [
-    (
-      "Tyre pressure warning", "Truck #402 reported low pressure in rear-left tyre.", "12m ago",
-      .warning
-    ),
-    (
-      "Driver break scheduled", "Driver David R. is reaching mandatory rest limit in 15 mins.",
-      "45m ago", .info
-    ),
-    (
-      "Geofence deviation", "Truck #109 exited the designated route area in North District.",
-      "1h ago", .critical
-    ),
-  ]
 
   var body: some View {
     NavigationStack {
@@ -216,20 +203,102 @@ struct FleetManagerHomeTab: View {
   // MARK: - Alerts Section
   private var alertsSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Recent Alerts")
-        .font(.system(size: 18, weight: .bold))
-        .foregroundStyle(FMSTheme.textPrimary)
+      Button {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+          alertsExpanded.toggle()
+        }
+      } label: {
+        HStack {
+          Text("Recent Alerts")
+            .font(.system(size: 18, weight: .bold))
+            .foregroundStyle(FMSTheme.textPrimary)
+          
+          if !viewModel.recentAlerts.isEmpty {
+            Text("\(viewModel.recentAlerts.count)")
+              .font(.system(size: 11, weight: .bold))
+              .foregroundStyle(FMSTheme.textSecondary)
+              .padding(.horizontal, 6)
+              .padding(.vertical, 2)
+              .background(FMSTheme.borderLight)
+              .clipShape(Capsule())
+          }
+          
+          Spacer()
+          
+          Image(systemName: alertsExpanded ? "chevron.up" : "chevron.down")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(FMSTheme.textTertiary)
+        }
+      }
+      .buttonStyle(.plain)
 
-      ForEach(alerts.indices, id: \.self) { index in
-        let alert = alerts[index]
-        AlertRow(
-          title: alert.title,
-          subtitle: alert.subtitle,
-          timeAgo: alert.timeAgo,
-          type: alert.type
+      if alertsExpanded {
+        VStack(spacing: 12) {
+          ForEach(viewModel.recentAlerts) { alert in
+            SwipeableAlertRow(
+              alert: alert,
+              title: alertTitle(for: alert),
+              type: alertType(for: alert.type),
+              timeAgo: timeAgoText(from: alert.createdAt),
+              vehiclePlate: viewModel.vehiclePlates[alert.vehicleId ?? ""],
+              onDelete: {
+                Task { await viewModel.deleteNotification(id: alert.id) }
+              }
+            )
+          }
+        }
+      } else if let latest = viewModel.recentAlerts.first {
+        SwipeableAlertRow(
+          alert: latest,
+          title: alertTitle(for: latest),
+          type: alertType(for: latest.type),
+          timeAgo: timeAgoText(from: latest.createdAt),
+          vehiclePlate: viewModel.vehiclePlates[latest.vehicleId ?? ""],
+          onDelete: {
+            Task { await viewModel.deleteNotification(id: latest.id) }
+          }
         )
+      } else {
+        Text("No recent alerts.")
+          .font(.system(size: 14))
+          .foregroundStyle(FMSTheme.textTertiary)
+          .padding(.top, 4)
       }
     }
+  }
+
+  private func alertTitle(for alert: Notification) -> String {
+    switch alert.type?.lowercased() {
+    case "document_expiry": return "Document Expiry"
+    case "geofence_entry": return "Geofence Entry"
+    case "geofence_exit": return "Geofence Deviation"
+    case "maintenance_due": return "Maintenance Due"
+    case "crash_alert": return "Safety Alert"
+    case "break_violation": return "Break Violation"
+    default: return "System Alert"
+    }
+  }
+
+  private func alertType(for type: String?) -> AlertType {
+    switch type?.lowercased() {
+    case "geofence_exit", "crash_alert", "break_violation":
+      return .critical
+    case "document_expiry", "maintenance_due":
+      return .warning
+    case "geofence_entry":
+      return .info
+    default:
+      return .info
+    }
+  }
+
+  private func timeAgoText(from date: Date?) -> String {
+    guard let date = date else { return "Just now" }
+    let seconds = Int(Date().timeIntervalSince(date))
+    if seconds < 60 { return "Just now" }
+    if seconds < 3600 { return "\(seconds / 60)m ago" }
+    if seconds < 86400 { return "\(seconds / 3600)h ago" }
+    return "\(seconds / 86400)d ago"
   }
 
   private var formattedDate: String {
@@ -435,4 +504,117 @@ private struct SOSAlertCard: View {
     if seconds < 3600 { return "\(seconds / 60)m ago" }
     return "\(seconds / 3600)h ago"
   }
+}
+
+// MARK: - Swipeable Alert Row
+
+private struct SwipeableAlertRow: View {
+    let alert: Notification
+    let title: String
+    let type: AlertType
+    let timeAgo: String
+    let vehiclePlate: String?
+    let onDelete: () -> Void
+    
+    @State private var offset: CGFloat = 0
+    @State private var isSwiped: Bool = false
+    @State private var willDelete: Bool = false
+    
+    private let buttonWidth: CGFloat = 80
+    
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // 1. Alert Content (Bottom Layer with Gesture)
+            AlertRow(
+                title: title,
+                subtitle: alert.message ?? "No details available",
+                timeAgo: timeAgo,
+                type: type,
+                vehiclePlate: vehiclePlate
+            )
+            .offset(x: offset)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                    .onChanged { value in
+                        let swipe = value.translation.width
+                        if swipe < 0 {
+                            // Organic resistance
+                            if swipe < -buttonWidth {
+                                offset = -buttonWidth + (swipe + buttonWidth) * 0.35
+                            } else {
+                                offset = swipe
+                            }
+                            
+                            // Subtle haptic when crossing the reveal threshold
+                            if !isSwiped && swipe < -buttonWidth / 2 {
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred(intensity: 0.6)
+                            }
+                        } else if isSwiped {
+                            let newOffset = -buttonWidth + swipe
+                            offset = newOffset > 0 ? 0 : newOffset
+                        }
+                    }
+                    .onEnded { value in
+                        let velocity = value.velocity.width
+                        let shouldSwipe = value.translation.width < -buttonWidth / 2 || velocity < -300
+                        
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)) {
+                            if shouldSwipe {
+                                offset = -buttonWidth
+                                isSwiped = true
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                            } else {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        }
+                    }
+            )
+
+            // 2. Delete Action (Top Layer when swiped)
+            if offset < 0 {
+                Button(role: .destructive) {
+                    deleteAction()
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 18, weight: .bold))
+                        Text("Clear")
+                            .font(.system(size: 10, weight: .black))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: buttonWidth - 8)
+                    .frame(maxHeight: .infinity)
+                    .background(FMSTheme.alertRed)
+                    .cornerRadius(12)
+                    .padding(.vertical, 8)
+                    .padding(.trailing, 4)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .zIndex(1)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .trailing)).animation(.spring(response: 0.3, dampingFraction: 0.8)),
+                    removal: .opacity.combined(with: .scale(scale: 0.8))
+                ))
+            }
+        }
+        .scaleEffect(willDelete ? 0.9 : 1.0)
+        .opacity(willDelete ? 0 : 1)
+    }
+    
+    private func deleteAction() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            willDelete = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            onDelete()
+        }
+    }
 }

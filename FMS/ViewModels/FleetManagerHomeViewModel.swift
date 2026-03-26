@@ -12,6 +12,8 @@ public final class FleetManagerHomeViewModel {
   public var managerName: String = "Manager"
   public var activeVehicleCount: Int = 0
   public var pendingOrderCount: Int = 0
+  public var recentAlerts: [Notification] = []
+  public var vehiclePlates: [String: String] = [:]
   public var errorMessage: String?
 
   // SOS specific state
@@ -45,6 +47,9 @@ public final class FleetManagerHomeViewModel {
       self.activeVehicleCount = activeVehicles.count
       self.pendingOrderCount = pendingOrders.count
 
+      // Fetch Recent Alerts
+      await fetchRecentAlerts()
+
       if let userId = try? await SupabaseService.shared.client.auth.session.user.id.uuidString {
         struct UserNameRow: Decodable {
           let name: String
@@ -64,6 +69,56 @@ public final class FleetManagerHomeViewModel {
       }
     } catch {
       self.errorMessage = error.localizedDescription
+    }
+  }
+
+  public func fetchRecentAlerts() async {
+    do {
+      let alerts: [Notification] = try await SupabaseService.shared.client
+        .from("notifications")
+        .select()
+        .order("created_at", ascending: false)
+        .limit(10)
+        .execute()
+        .value
+      self.recentAlerts = alerts
+      
+      // Fetch associated vehicle plates
+      let vehicleIds = Array(Set(alerts.compactMap { $0.vehicleId }))
+      if !vehicleIds.isEmpty {
+        struct VehiclePlateRow: Decodable {
+          let id: String
+          let plate_number: String
+        }
+        
+        let plates: [VehiclePlateRow] = try await SupabaseService.shared.client
+          .from("vehicles")
+          .select("id, plate_number")
+          .in("id", values: vehicleIds)
+          .execute()
+          .value
+        
+        for row in plates {
+          self.vehiclePlates[row.id] = row.plate_number
+        }
+      }
+    } catch {
+      print("[FMS] fetchRecentAlerts failed: \(error)")
+    }
+  }
+
+  public func deleteNotification(id: String) async {
+    do {
+      try await SupabaseService.shared.client
+        .from("notifications")
+        .delete()
+        .eq("id", value: id)
+        .execute()
+      
+      // Update local state immediately for responsiveness
+      self.recentAlerts.removeAll { $0.id == id }
+    } catch {
+      print("[FMS] deleteNotification failed: \(error)")
     }
   }
 
