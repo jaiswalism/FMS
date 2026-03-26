@@ -50,6 +50,7 @@ public struct FleetReportView: View {
     .background(FMSTheme.backgroundPrimary)
     .navigationTitle("Fleet Report")
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar(.visible, for: .navigationBar)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         if !viewModel.isLoading {
