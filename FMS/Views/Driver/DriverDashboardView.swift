@@ -113,7 +113,8 @@ public struct DriverDashboardView: View {
             SOSCountdownView(
                 viewModel: SOSViewModel(
                     driverId: viewModel.driver.id,
-                    vehicleId: viewModel.assignedVehicle?.id ?? "",
+                    vehicleId: viewModel.activeTrip?.vehicleId ?? viewModel.assignedVehicle?.id ?? "",
+                    driverPhoneNumber: viewModel.driver.phone,
                     tripId: viewModel.activeTrip?.id
                 ),
                 onSOSSent: {

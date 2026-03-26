@@ -87,6 +87,9 @@ public struct TrackingShipmentView: View {
         // Hide the harsh flat background to let our custom gradient shine
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .task {
+            await viewModel.fetchDetails()
+        }
     }
     
     // MARK: - Bottom Sheet Components
@@ -176,7 +179,7 @@ public struct TrackingShipmentView: View {
                 Text("Trip Number")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(FMSTheme.textSecondary)
-                Text(viewModel.trip?.id ?? "N/A")
+                Text(viewModel.formattedTripId)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(FMSTheme.textPrimary)
             }

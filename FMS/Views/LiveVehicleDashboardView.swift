@@ -27,7 +27,6 @@ public struct LiveVehicleDashboardView: View {
                             Circle()
                                 .fill(FMSTheme.cardBackground)
                                 .frame(width: 48, height: 48)
-                                .shadow(color: FMSTheme.symbolBackground, radius: 8, x: 0, y: 4)
                             
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 18, weight: .semibold))

@@ -1,5 +1,6 @@
 import Supabase
 import SwiftUI
+import CoreLocation
 
 public struct FleetManagerDashboardView: View {
   public init() {}
@@ -40,10 +41,7 @@ struct FleetManagerHomeTab: View {
   @State private var navigateToLiveFleet = false
   @State private var navigateToProfile = false
   @State private var navigateToOrders = false
-  @State private var activeSOSAlerts: [SOSAlert] = []
-  @State private var sosPollingTimer: Timer?
   @State private var sosExpanded: Bool = false
-  @State private var isFetchingSOS = false
 
   private let alerts: [(title: String, subtitle: String, timeAgo: String, type: AlertType)] = [
     (
@@ -67,11 +65,6 @@ struct FleetManagerHomeTab: View {
           // Header
           headerSection
 
-          // Active SOS Alerts
-          if !activeSOSAlerts.isEmpty {
-            sosAlertsSection
-          }
-
           // Fleet Status Card
           FleetStatusCard(
             activeCount: viewModel.activeVehicleCount,
@@ -94,6 +87,11 @@ struct FleetManagerHomeTab: View {
             }
           )
 
+          // Active SOS Alerts — repositioned below Orders
+          if !viewModel.activeSOSAlerts.isEmpty {
+            sosAlertsSection
+          }
+
           // Recent Alerts Section
           alertsSection
         }
@@ -111,14 +109,13 @@ struct FleetManagerHomeTab: View {
         OrdersListView()
       }
       .onAppear {
-        startSOSPolling()
+        viewModel.startSOSPolling()
         Task {
           await viewModel.loadDashboardData()
         }
       }
       .onDisappear {
-        sosPollingTimer?.invalidate()
-        sosPollingTimer = nil
+        viewModel.stopSOSPolling()
       }
     }
   }
@@ -140,13 +137,13 @@ struct FleetManagerHomeTab: View {
             .background(FMSTheme.alertRed)
             .cornerRadius(8)
 
-          Text("\(activeSOSAlerts.count) Active SOS Alert\(activeSOSAlerts.count == 1 ? "" : "s")")
+          Text("\(viewModel.activeSOSAlerts.count) Active SOS Alert\(viewModel.activeSOSAlerts.count == 1 ? "" : "s")")
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(FMSTheme.alertRed)
 
           Spacer()
 
-          if activeSOSAlerts.count > 1 {
+          if viewModel.activeSOSAlerts.count > 1 {
             Image(systemName: sosExpanded ? "chevron.up" : "chevron.down")
               .font(.system(size: 12, weight: .bold))
               .foregroundStyle(FMSTheme.alertRed)
@@ -166,52 +163,22 @@ struct FleetManagerHomeTab: View {
       // Alert cards
       VStack(spacing: 10) {
         if sosExpanded {
-          ForEach(Array(activeSOSAlerts.enumerated()), id: \.element.id) { index, alert in
+          ForEach(Array(viewModel.activeSOSAlerts.enumerated()), id: \.element.id) { index, alert in
             SOSAlertCard(
+              viewModel: viewModel,
               alert: alert,
               isLatest: index == 0
             )
           }
-        } else if let latest = activeSOSAlerts.first {
+        } else if let latest = viewModel.activeSOSAlerts.first {
           SOSAlertCard(
+            viewModel: viewModel,
             alert: latest,
             isLatest: true
           )
         }
       }
       .padding(.top, 10)
-    }
-  }
-
-  // MARK: - SOS Polling
-  private func startSOSPolling() {
-    Task { await fetchSOSAlerts() }
-    sosPollingTimer?.invalidate()
-    sosPollingTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
-      Task { @MainActor in
-        await fetchSOSAlerts()
-      }
-    }
-  }
-
-  private func fetchSOSAlerts() async {
-    guard !isFetchingSOS else { return }
-    isFetchingSOS = true
-    defer { isFetchingSOS = false }
-
-    do {
-      let response = try await SupabaseService.shared.client
-        .from("sos_alerts")
-        .select()
-        .eq("status", value: SOSAlertStatus.active.rawValue)
-        .order("timestamp", ascending: false)
-        .limit(10)
-        .execute()
-
-      let alerts = try JSONDecoder.supabase().decode([SOSAlert].self, from: response.data)
-      activeSOSAlerts = alerts
-    } catch {
-      print("[FMS] fetchSOSAlerts failed: \(error)")
     }
   }
 
@@ -275,12 +242,15 @@ struct FleetManagerHomeTab: View {
 // MARK: - SOS Alert Card
 
 private struct SOSAlertCard: View {
+  let viewModel: FleetManagerHomeViewModel
   let alert: SOSAlert
   var isLatest: Bool = false
   @Environment(\.openURL) private var openURL
+  @State private var locationAddress: String = "Fetching location..."
+  @State private var isResolving = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 12) {
       HStack {
         Image(systemName: "exclamationmark.triangle.fill")
           .font(.system(size: 16, weight: .semibold))
@@ -307,67 +277,96 @@ private struct SOSAlertCard: View {
           .foregroundStyle(isLatest ? FMSTheme.amber : FMSTheme.textTertiary)
       }
 
-      HStack(spacing: 12) {
-        VStack(alignment: .leading, spacing: 3) {
-          Text("Driver: \(alert.driverId)")
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Driver: \(viewModel.driverNames[alert.driverId] ?? alert.driverId)")
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(FMSTheme.textPrimary)
-
-          Text("Vehicle: \(alert.vehicleId)")
-            .font(.system(size: 12))
-            .foregroundStyle(FMSTheme.textSecondary)
-
-          if let speed = alert.speed, speed > 0 {
-            Text(String(format: "Speed: %.0f km/h", speed))
-              .font(.system(size: 12))
-              .foregroundStyle(FMSTheme.textSecondary)
+          
+          HStack(spacing: 4) {
+            Image(systemName: "mappin.circle.fill")
+              .font(.system(size: 10))
+            Text(locationAddress)
+              .font(.system(size: 11))
           }
+          .foregroundStyle(FMSTheme.textSecondary)
+          .padding(.top, 2)
         }
 
         Spacer()
 
-        VStack(spacing: 2) {
-          Text(String(format: "%.4f", alert.latitude))
-            .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(FMSTheme.textSecondary)
-          Text(String(format: "%.4f", alert.longitude))
-            .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(FMSTheme.textSecondary)
+        if let speed = alert.speed, speed > 0 {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text("\(Int(speed))")
+              .font(.system(size: 18, weight: .black))
+              .foregroundStyle(FMSTheme.amber)
+            Text("km/h")
+              .font(.system(size: 10, weight: .bold))
+              .foregroundStyle(FMSTheme.textTertiary)
+          }
         }
       }
 
-      // Call driver
-      Button {
-        if let phone = alert.driverPhoneNumber, !phone.isEmpty {
-          let cleanedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
-          if let url = URL(string: "tel:\(cleanedPhone)") {
-            openURL(url)
+      // Actions
+      HStack(spacing: 12) {
+        // Call driver
+        Button {
+          if let phone = viewModel.driverPhones[alert.driverId], !phone.isEmpty {
+            let cleanedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let url = URL(string: "tel:\(cleanedPhone)") {
+              openURL(url)
+            }
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "phone.fill")
+              .font(.system(size: 13, weight: .semibold))
+            Text("Call Driver")
+              .font(.system(size: 13, weight: .bold))
+          }
+          .foregroundStyle(.white)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 10)
+          .background(FMSTheme.alertGreen)
+          .cornerRadius(10)
+        }
+        .buttonStyle(.plain)
+        .disabled(
+          viewModel.driverPhones[alert.driverId] == nil
+            || viewModel.driverPhones[alert.driverId]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              ?? true
+        )
+        .opacity(
+          (viewModel.driverPhones[alert.driverId] == nil
+            || viewModel.driverPhones[alert.driverId]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              ?? true)
+            ? 0.5 : 1.0)
+
+        // Resolve Button
+        Button {
+          isResolving = true
+          Task {
+            await viewModel.resolveSOSAlert(id: alert.id)
+            isResolving = false
+          }
+        } label: {
+          if isResolving {
+            ProgressView()
+              .tint(.white)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 10)
+          } else {
+            Text("Resolve SOS")
+              .font(.system(size: 13, weight: .bold))
+              .foregroundStyle(.white)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 10)
           }
         }
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "phone.fill")
-            .font(.system(size: 13, weight: .semibold))
-          Text("Call Driver")
-            .font(.system(size: 13, weight: .bold))
-        }
-        .foregroundStyle(.white)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(FMSTheme.alertGreen)
+        .background(FMSTheme.textTertiary)
         .cornerRadius(10)
+        .buttonStyle(.plain)
       }
-      .buttonStyle(.plain)
-      .disabled(
-        alert.driverPhoneNumber == nil
-          || alert.driverPhoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ?? true
-      )
-      .opacity(
-        (alert.driverPhoneNumber == nil
-          || alert.driverPhoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ?? true)
-          ? 0.5 : 1.0)
     }
     .padding(14)
     .background(statusColor.opacity(0.06))
@@ -376,6 +375,40 @@ private struct SOSAlertCard: View {
       RoundedRectangle(cornerRadius: 14)
         .stroke(statusColor.opacity(0.4), lineWidth: 1.5)
     )
+    .task {
+      await reverseGeocode()
+    }
+  }
+
+  private func reverseGeocode() async {
+    let geocoder = CLGeocoder()
+    let location = CLLocation(latitude: alert.latitude, longitude: alert.longitude)
+    
+    do {
+      let placemarks = try await geocoder.reverseGeocodeLocation(location)
+      if let placemark = placemarks.first {
+        let street = placemark.thoroughfare ?? ""
+        let subLocality = placemark.subLocality ?? ""
+        let locality = placemark.locality ?? ""
+        
+        var address = ""
+        if !street.isEmpty { address += street }
+        if !subLocality.isEmpty { 
+          address += (address.isEmpty ? "" : ", ") + subLocality 
+        }
+        if !locality.isEmpty {
+          address += (address.isEmpty ? "" : ", ") + locality
+        }
+        
+        if address.isEmpty {
+          self.locationAddress = "Unknown location"
+        } else {
+          self.locationAddress = address
+        }
+      }
+    } catch {
+      self.locationAddress = "Location unavailable"
+    }
   }
 
   private var statusColor: Color {

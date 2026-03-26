@@ -18,8 +18,22 @@ final class LiveVehicleViewModel {
         let vehicle: Vehicle
         
         var completionPercentage: Int {
-            // Placeholder: Could be based on distance covered if available
-            return 45 
+            // If the trip is already completed, it's 100%
+            if trip.status?.lowercased() == "completed" { return 100 }
+            
+            // For active trips, calculate based on time elapsed vs estimated duration
+            guard let startTime = trip.startTime,
+                  let estimatedMin = trip.estimatedDurationMinutes,
+                  estimatedMin > 0 else {
+                return 0 // Fallback if no start time or estimate
+            }
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            let total = Double(estimatedMin * 60)
+            let progress = Int((elapsed / total) * 100)
+            
+            // Clamp between 0 and 99 (100 is reserved for 'completed' status)
+            return min(max(progress, 0), 99)
         }
     }
     
