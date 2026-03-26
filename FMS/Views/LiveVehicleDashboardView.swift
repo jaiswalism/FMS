@@ -40,7 +40,7 @@ public struct LiveVehicleDashboardView: View {
                             .font(.system(size: 26, weight: .bold))
                             .foregroundColor(FMSTheme.textPrimary)
                         
-                        Text("\(viewModel.filteredVehicles.isEmpty ? 14 : viewModel.filteredVehicles.count) Currently Active")
+                        Text("\(viewModel.filteredTrips.count) Currently Active")
                             .font(.system(size: 14))
                             .foregroundColor(FMSTheme.textSecondary)
                     }
@@ -57,32 +57,41 @@ public struct LiveVehicleDashboardView: View {
                         if viewModel.isLoading {
                             ProgressView()
                                 .padding(.top, 50)
+                                .tint(FMSTheme.amber)
+                        } else if viewModel.filteredTrips.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "truck.box")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(FMSTheme.textTertiary)
+                                Text("No active vehicles found")
+                                    .font(.headline)
+                                    .foregroundColor(FMSTheme.textSecondary)
+                            }
+                            .padding(.top, 100)
                         } else {
-                            // Using a mix of actual and mock data to show the layout precisely.
-                            ForEach(0..<6) { _ in
+                            ForEach(viewModel.filteredTrips) { info in
                                 NavigationLink {
-                                    TrackingShipmentView()
+                                    TrackingShipmentView(trip: info.trip, vehicle: info.vehicle)
                                 } label: {
                                     LiveTripCard(
-                                        plateNumber: "MH02H0942",
-                                        origin: "MYS",
-                                        destination: "BLR",
-                                        completionPercentage: 48
+                                        plateNumber: info.vehicle.plateNumber,
+                                        origin: info.trip.startName ?? "Mysore",
+                                        destination: info.trip.endName ?? "Bengaluru",
+                                        completionPercentage: info.completionPercentage
                                     )
                                 }
-                                .buttonStyle(.plain) // Prevents the card from being highlighted blue
+                                .buttonStyle(.plain)
                             }
                         }
-                    } // <-- LazyVStack cleanly closes here
-                    .padding(.horizontal, 20) // Padding is now correctly applied to the LazyVStack
+                    }
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 120)
                 }
             }
         }
         .navigationBarHidden(true)
         .task {
-            // Uncomment when hooked up to real backend
-            // await viewModel.fetchVehicles()
+            await viewModel.fetchVehicles()
         }
     }
 }

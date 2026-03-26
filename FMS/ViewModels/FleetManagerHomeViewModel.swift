@@ -21,7 +21,7 @@ public final class FleetManagerHomeViewModel {
 
     do {
       async let activeVehiclesTask: [IDRow] = SupabaseService.shared.client
-        .from("vehicles")
+        .from("trips")
         .select("id")
         .eq("status", value: "active")
         .execute()

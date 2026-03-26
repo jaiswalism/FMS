@@ -23,8 +23,9 @@ public struct TrackingShipmentView: View {
     
     // MARK: - Local theme properties have been removed since FMSTheme is now globally adaptive.
 
-    
-    public init() {}
+    public init(trip: Trip? = nil, vehicle: Vehicle? = nil) {
+        self._viewModel = State(initialValue: TrackingShipmentViewModel(trip: trip, vehicle: vehicle))
+    }
     
     public var body: some View {
         ZStack(alignment: .bottom) {

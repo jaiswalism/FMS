@@ -41,22 +41,18 @@ public class TrackingShipmentViewModel {
         return formatter.string(from: estimatedEnd)
     }
     
-    // Temporary initializer with mock data mapped to your REAL models for UI testing
-    public init() {
-        self.trip = Trip(
-            id: "TRP-8492-MH",
-            shipmentDescription: "Electronics",
-            startLat: 12.35,
-            startLng: 76.65,
-            startName: "Warehouse A, Industrial Layout, Mysuru",
-            endLat: 12.84,
-            endLng: 77.66,
-            endName: "Tech Park Phase 2, Electronic City, Bengaluru",
-            estimatedDurationMinutes: 180,
-            startTime: Date()
-        )
-        self.driver = Driver(companyID: "CMP-01", name: "David Reynolds", employeeID: "EMP-492")
-        self.vehicle = Vehicle(id: "V-01", plateNumber: "MH02H0942", chassisNumber: "CHS123", fuelType: "Diesel", fuelTankCapacity: 200, createdAt: Date())
-        self.latestGPSLog = TripGPSLog(id: "LOG-1", tripId: "TRP-8492-MH", lat: 12.35, lng: 76.65, speed: 45, recordedAt: Date())
+    // Initializer for live data
+    public init(trip: Trip? = nil, vehicle: Vehicle? = nil, driver: Driver? = nil, latestGPSLog: TripGPSLog? = nil) {
+        self.trip = trip
+        self.vehicle = vehicle
+        self.driver = driver
+        self.latestGPSLog = latestGPSLog
+        
+        // If no GPS log provided, use trip's start coordinates as a fallback for the map
+        if latestGPSLog == nil {
+            if let lat = trip?.startLat, let lng = trip?.startLng {
+                self.latestGPSLog = TripGPSLog(id: "fallback", tripId: trip?.id ?? "", lat: lat, lng: lng, speed: 0, recordedAt: Date())
+            }
+        }
     }
 }
