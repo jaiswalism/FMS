@@ -11,21 +11,23 @@ public struct MaintenanceDashboardView: View {
     var woStore: WorkOrderStore
     var invStore: InventoryStore
     @State private var fleetStore     = FleetViewModel()
-    @State private var selectedFilter  = "All"
+    @State private var selectedFilter: String? = "Pending"
     @State private var showingCreateWO = false
     @State private var isSearchActive  = false
     @State private var searchText      = ""
 
-    let filters = ["All", "Pending", "In Progress", "Completed"]
+    let filters = ["Pending", "In Progress", "Completed"]
 
     var filteredOrders: [WOItem] {
         var result = woStore.orders
         
-        switch selectedFilter {
-        case "Pending":     result = result.filter { $0.status == .pending }
-        case "In Progress": result = result.filter { $0.status == .inProgress }
-        case "Completed":   result = result.filter { $0.status == .completed }
-        default:            break
+        if let filter = selectedFilter {
+            switch filter {
+            case "Pending":     result = result.filter { $0.status == .pending }
+            case "In Progress": result = result.filter { $0.status == .inProgress }
+            case "Completed":   result = result.filter { $0.status == .completed }
+            default:            break
+            }
         }
         
         if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -182,7 +184,11 @@ public struct MaintenanceDashboardView: View {
                     ForEach(filters, id: \.self) { filter in
                         Button {
                             withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                                selectedFilter = filter
+                                if selectedFilter == filter {
+                                    selectedFilter = nil
+                                } else {
+                                    selectedFilter = filter
+                                }
                             }
                         } label: {
                             Text(filter).font(.system(size: 13, weight: .semibold))
@@ -195,7 +201,7 @@ public struct MaintenanceDashboardView: View {
                 .padding(.horizontal, 16)
             }
 
-            Text("\(filteredOrders.count) order\(filteredOrders.count == 1 ? "" : "s")")
+            Text("\(selectedFilter ?? "All") (\(filteredOrders.count))")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(FMSTheme.textSecondary)
                 .padding(.horizontal, 16)
